@@ -508,7 +508,7 @@ MonoBehaviour:
       z: 0
     IsSprinting: 0
     IsOnStickySurface: 0
-  MeshPrefab: {fileID: 4260105767809303429, guid: e57eaae6195aaa243b4339327f1f99a5, type: 3}
+  MeshPrefab: {fileID: 5493695718472511879, guid: 571453695f3fd4837bb48b1afea5e1b7, type: 3}
   DefaultCameraTarget: {fileID: 6247949772695845543}
   SwimmingCameraTarget: {fileID: 4059659098717927741}
   ClimbingCameraTarget: {fileID: 1276707054141806430}

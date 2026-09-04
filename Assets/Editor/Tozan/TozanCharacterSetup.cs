@@ -11,7 +11,7 @@ namespace Tozan.Editor
     /// Character roles (do not mix):
     /// Casual_Male — display / future retopo only. Blender IK; legs are not Hips descendants. Never Humanoid.
     /// UAL / UAL2 — Starter Assets Humanoid. Runtime visual prefers UAL2.
-    /// Erika — DPS Humanoid avatar on Player.prefab.
+    /// Erika — DPS Humanoid avatar on Player.prefab; NaturalRockSandbox ECS visual via TozanErikaPlatformerSetup.
     /// </summary>
     public static class TozanCharacterSetup
     {

@@ -207,24 +207,57 @@ namespace Tozan.Tests
 
         public static int ReadHybridClipIndex()
         {
+            var animator = FindHybridCharacterMeshAnimator();
+            return animator != null ? animator.GetInteger("ClipIndex") : -1;
+        }
+
+        public static Animator FindHybridCharacterMeshAnimator()
+        {
             foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsInactive.Include))
             {
-                if (animator == null || animator.gameObject.name.IndexOf("CharacterMesh") < 0)
-                    continue;
-                return animator.GetInteger("ClipIndex");
+                if (animator != null && animator.gameObject.name.IndexOf("CharacterMesh") >= 0)
+                    return animator;
             }
-            return -1;
+
+            return null;
+        }
+
+        public static bool HasErikaRendererIdentity(Animator animator)
+        {
+            if (animator == null)
+                return false;
+
+            foreach (var renderer in animator.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (renderer.sharedMesh == null)
+                    continue;
+                var meshName = renderer.sharedMesh.name;
+                if (renderer.enabled && renderer.gameObject.activeInHierarchy &&
+                    meshName.IndexOf("Erika", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+
+            return false;
+        }
+
+        public static bool HasClipIndexParameter(Animator animator)
+        {
+            if (animator == null)
+                return false;
+
+            foreach (var parameter in animator.parameters)
+            {
+                if (parameter.name == "ClipIndex" && parameter.type == AnimatorControllerParameterType.Int)
+                    return true;
+            }
+
+            return false;
         }
 
         public static float ReadHybridAnimatorSpeed()
         {
-            foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsInactive.Include))
-            {
-                if (animator == null || animator.gameObject.name.IndexOf("CharacterMesh") < 0)
-                    continue;
-                return animator.speed;
-            }
-            return -1f;
+            var animator = FindHybridCharacterMeshAnimator();
+            return animator != null ? animator.speed : -1f;
         }
 
         public static bool TryFindVerticalWallAabb(EntityManager em, out Aabb wallAabb)

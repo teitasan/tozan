@@ -91,6 +91,8 @@ namespace Tozan.Editor
             EnsureFolders();
             try { TozanCharacterSetup.EnsureReady(); }
             catch (System.Exception ex) { Debug.LogException(ex); }
+            try { TozanErikaPlatformerSetup.EnsureReady(); }
+            catch (System.Exception ex) { Debug.LogException(ex); }
             Debug.Log(BuildNaturalRockSandbox());
         }
 

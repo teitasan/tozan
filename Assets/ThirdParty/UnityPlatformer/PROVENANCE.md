@@ -25,6 +25,8 @@ This tree is a **project-local vendor snapshot**, not a git submodule. No upstre
 
 Official sample scenes/prefabs keep tag-based climbing where authored. NaturalRockSandbox uses `TozanPlatformerGeometryAuthoring` (`GeometryOnly`) on the Platformer character prefab.
 
+NaturalRockSandbox display mesh: **Erika** (`Assets/Characters/Erika/ErikaCharacterMesh.prefab`), wired by `TozanErikaPlatformerSetup`. Official `CharacterMesh.prefab` (ProtoCharacter) remains in-tree as rollback reference. The `Freehang Climb` source clip is copied locally with the DPS `EnableController` event removed; no DPS Player or Locomotion runtime is used by the ECS player.
+
 ## Related Tozan runtime (not upstream)
 
 | Path | Role |
