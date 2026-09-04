@@ -39,6 +39,29 @@ namespace Tozan.Tests
         }
 
         [UnityTest]
+        public IEnumerator NaturalRockSandbox_ConcaveMesh_DoesNotSpamClosestPoint()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
+            yield return null;
+            yield return new WaitForFixedUpdate();
+
+            var player = GameObject.Find("TraverserPlayer");
+            var irregular = GameObject.Find("Rock_Irregular");
+            var trap = GameObject.Find("Rock_VariableWidthLedge");
+            Assert.IsNotNull(player);
+            Assert.IsNotNull(irregular);
+            Assert.IsNotNull(trap);
+
+            player.transform.position = irregular.transform.position + Vector3.up * 2.2f;
+            for (var i = 0; i < 20; i++)
+                yield return new WaitForFixedUpdate();
+
+            player.transform.position = trap.transform.position + Vector3.up * 2.0f;
+            for (var i = 0; i < 20; i++)
+                yield return new WaitForFixedUpdate();
+        }
+
+        [UnityTest]
         [Timeout(25000)]
         public IEnumerator NaturalRockSandbox_Traverser_GrabHangTraverseMantleJumpGrab()
         {

@@ -417,7 +417,7 @@ namespace Traverser
                         animationController.animator.CrossFade(locomotionData.fallTransitionAnimation.animationStateName, locomotionData.fallTransitionAnimation.transitionDuration, 0);
 
                         TraverserTransform contactTransform = TraverserTransform.Get(transform.position, transform.rotation);
-                        TraverserTransform targetTransform = TraverserTransform.Get(collision.ground.ClosestPoint(animationController.skeletonPos)
+                        TraverserTransform targetTransform = TraverserTransform.Get(TraverserCharacterController.SafeClosestPoint(collision.ground, animationController.skeletonPos)
                             + transform.forward * locomotionData.fallToRollTransitionData.targetOffset + Vector3.up * controller.capsuleHeight / 2.0f, // roll animation offset
                             transform.rotation);
 
@@ -432,7 +432,7 @@ namespace Traverser
                         animationController.animator.CrossFade(locomotionData.fallTransitionAnimation.animationStateName, locomotionData.fallTransitionAnimation.transitionDuration, 0);
 
                         TraverserTransform contactTransform = TraverserTransform.Get(transform.position, transform.rotation);
-                        TraverserTransform targetTransform = TraverserTransform.Get(collision.ground.ClosestPoint(animationController.skeletonPos)
+                        TraverserTransform targetTransform = TraverserTransform.Get(TraverserCharacterController.SafeClosestPoint(collision.ground, animationController.skeletonPos)
                             + transform.forward * locomotionData.hardLandingTransitionData.targetOffset + Vector3.up * controller.capsuleHeight / 2.0f, // roll animation offset
                             transform.rotation);
 

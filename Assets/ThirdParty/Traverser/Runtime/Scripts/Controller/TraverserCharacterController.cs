@@ -327,6 +327,19 @@ namespace Traverser
             //snapshotState.Reset();
         }
 
+        // TOZAN: Physics.ClosestPoint is only valid on Box/Sphere/Capsule and convex Mesh.
+        // NaturalRockSandbox uses concave MeshColliders; calling ClosestPoint floods the Console.
+        public static Vector3 SafeClosestPoint(Collider collider, Vector3 position)
+        {
+            if (collider == null)
+                return position;
+            if (collider is BoxCollider || collider is SphereCollider || collider is CapsuleCollider)
+                return collider.ClosestPoint(position);
+            if (collider is MeshCollider meshCollider && meshCollider.convex)
+                return collider.ClosestPoint(position);
+            return collider.ClosestPointOnBounds(position);
+        }
+
         // --------------------------------
     }
 }

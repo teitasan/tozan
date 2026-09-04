@@ -246,7 +246,7 @@ namespace Traverser
 
                     // --- Obtain collider's closest point and compute a new velocity vector ---
                     Vector3 correctedPosition = state.previousCollision.position;
-                    Vector3 closestColliderPosition = state.previousCollision.ground.ClosestPoint(state.currentCollision.position);
+                    Vector3 closestColliderPosition = SafeClosestPoint(state.previousCollision.ground, state.currentCollision.position);
                     Vector3 correctedVelocityVector = closestColliderPosition - state.previousCollision.position;
 
                     // --- Project our current velocity on the newly computed velocity vector ---                   
@@ -280,7 +280,11 @@ namespace Traverser
 
                 for (int i = 0; i < numColliders; ++i)
                 {
-                    colliderPosition = hitColliders[i].ClosestPoint(position);
+                    var hit = hitColliders[i];
+                    if (hit == null || hit.transform == transform || hit.transform.IsChildOf(transform))
+                        continue;
+
+                    colliderPosition = SafeClosestPoint(hit, position);
 
                     if (Mathf.Abs(colliderPosition.y - position.y) < minDistance)
                         chosenGround = i;

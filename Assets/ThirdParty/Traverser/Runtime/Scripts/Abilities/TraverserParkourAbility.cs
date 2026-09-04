@@ -265,7 +265,7 @@ namespace Traverser
             float speed = Vector3.Magnitude(controller.targetVelocity);
 
             // --- End warp point should be at skeleton height ---
-            targetTransform.t.y = controller.current.ground.ClosestPoint(targetTransform.t).y
+            targetTransform.t.y = TraverserCharacterController.SafeClosestPoint(controller.current.ground, targetTransform.t).y
                 + (animationController.skeletonPos.y - transform.position.y);
 
             // --- Check if we are jogging or running and play appropriate transition ---
