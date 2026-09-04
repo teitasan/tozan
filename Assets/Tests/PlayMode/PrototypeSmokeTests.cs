@@ -22,6 +22,12 @@ namespace Tozan.Tests
         }
 
         [Test]
+        public void NaturalRockSandbox_AssetExists()
+        {
+            Assert.IsTrue(System.IO.File.Exists("Assets/Scenes/NaturalRockSandbox.unity"));
+        }
+
+        [Test]
         public void TerrainSandbox_AssetExists()
         {
             Assert.IsTrue(System.IO.File.Exists("Assets/Scenes/TerrainSandbox.unity"));

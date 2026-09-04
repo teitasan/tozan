@@ -14,8 +14,10 @@ namespace Tozan.Editor
         const string ClimbingScenePath = "Assets/Scenes/ClimbingSandbox.unity";
         const string StarterScenePath = "Assets/Scenes/StarterAssetsPlayground.unity";
         const string TerrainScenePath = "Assets/Scenes/TerrainSandbox.unity";
+        const string NaturalScenePath = "Assets/Scenes/NaturalRockSandbox.unity";
         const string PlayerPrefabPath = "Assets/ThirdParty/DynamicParkourSystem/Prefabs/Player.prefab";
         const string InputActionsPath = "Assets/StarterAssets/InputSystem/StarterAssets.inputactions";
+        const string RockMaterialPath = "Assets/Materials/NaturalRock.mat";
 
         static readonly Vector3[] BoxLayout =
         {
@@ -47,6 +49,7 @@ namespace Tozan.Editor
             string climbing;
             string starter;
             string terrain;
+            string natural;
             try { climbing = BuildClimbingSandbox(); }
             catch (System.Exception ex)
             {
@@ -65,14 +68,30 @@ namespace Tozan.Editor
                 terrain = "FAILED: " + ex;
                 Debug.LogException(ex);
             }
+            try { natural = BuildNaturalRockSandbox(); }
+            catch (System.Exception ex)
+            {
+                natural = "FAILED: " + ex;
+                Debug.LogException(ex);
+            }
             AssetDatabase.SaveAssets();
             EditorBuildSettings.scenes = new[]
             {
                 new EditorBuildSettingsScene(ClimbingScenePath, true),
                 new EditorBuildSettingsScene(StarterScenePath, true),
-                new EditorBuildSettingsScene(TerrainScenePath, true)
+                new EditorBuildSettingsScene(TerrainScenePath, true),
+                new EditorBuildSettingsScene(NaturalScenePath, true)
             };
-            return $"ok climbing={climbing} starter={starter} terrain={terrain}";
+            return $"ok climbing={climbing} starter={starter} terrain={terrain} natural={natural}";
+        }
+
+        [MenuItem("Tozan/Build Natural Rock Sandbox")]
+        public static void BuildNaturalFromMenu()
+        {
+            EnsureFolders();
+            try { TozanCharacterSetup.EnsureReady(); }
+            catch (System.Exception ex) { Debug.LogException(ex); }
+            Debug.Log(BuildNaturalRockSandbox());
         }
 
         static void EnsureFolders()
@@ -147,25 +166,43 @@ namespace Tozan.Editor
             PlacePrefab("Assets/ThirdParty/DynamicParkourSystem/Prefabs/Environment/Jump/Reach Surface.prefab",
                 new Vector3(20f, 0f, 8f), Quaternion.identity, "Jump_Reach");
 
-            GameObject playerRoot = null;
-            var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
-            if (playerPrefab != null)
-            {
-                playerRoot = (GameObject)PrefabUtility.InstantiatePrefab(playerPrefab);
-                playerRoot.name = "Player";
-                playerRoot.transform.position = new Vector3(0f, 0.1f, 0f);
-            }
-            else
-            {
-                Debug.LogWarning("DPS Player prefab missing; creating Starter Assets player instead.");
-                playerRoot = CreateStarterAssetsPlayer(new Vector3(0f, 0.1f, 0f));
-            }
-
+            var playerRoot = PlaceDpsPlayer(new Vector3(0f, 0.1f, 0f));
             RemoveCamerasOutside(playerRoot);
             SetupMainCamera(false);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ClimbingScenePath);
             return ClimbingScenePath;
+        }
+
+        public static string BuildNaturalRockSandbox()
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+            scene.name = "NaturalRockSandbox";
+
+            var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            ground.name = "Ground";
+            ground.tag = "Untagged";
+            ground.layer = 0;
+            ground.transform.position = Vector3.zero;
+            ground.transform.localScale = new Vector3(8f, 1f, 8f);
+            ground.isStatic = true;
+
+            var rocks = new GameObject("NaturalRocks");
+            rocks.tag = "Untagged";
+            rocks.layer = 0;
+            TozanNaturalRockGeometry.BuildCourse(rocks.transform, GetOrCreateRockMaterial());
+
+            var start = new GameObject("TraversalStart");
+            start.transform.SetPositionAndRotation(new Vector3(0f, 0.1f, 0.2f), Quaternion.identity);
+
+            var playerRoot = PlaceDpsPlayer(start.transform.position);
+            playerRoot.transform.rotation = Quaternion.identity;
+            RemoveCamerasOutside(playerRoot);
+            SetupMainCamera(false);
+            EnsureInBuildSettings(NaturalScenePath);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, NaturalScenePath);
+            return NaturalScenePath;
         }
 
         public static string BuildStarterAssetsPlayground()
@@ -186,6 +223,7 @@ namespace Tozan.Editor
             }
 
             CreateStarterAssetsPlayer(new Vector3(0f, 0.1f, 0f));
+            // Casual_Male is display-only (not Humanoid). Live Starter visual is UAL2.
             var casual = AssetDatabase.LoadAssetAtPath<GameObject>(TozanCharacterSetup.CharacterPath);
             if (casual != null)
             {
@@ -327,6 +365,48 @@ namespace Tozan.Editor
                 pixels[i] = color;
             tex.SetPixels(pixels);
             tex.Apply();
+        }
+
+        static GameObject PlaceDpsPlayer(Vector3 position)
+        {
+            var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+            if (playerPrefab != null)
+            {
+                var playerRoot = (GameObject)PrefabUtility.InstantiatePrefab(playerPrefab);
+                playerRoot.name = "Player";
+                playerRoot.transform.position = position;
+                return playerRoot;
+            }
+
+            Debug.LogWarning("DPS Player prefab missing; creating Starter Assets player instead.");
+            return CreateStarterAssetsPlayer(position);
+        }
+
+        static Material GetOrCreateRockMaterial()
+        {
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(RockMaterialPath);
+            if (mat != null)
+                return mat;
+
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            mat = new Material(shader != null ? shader : Shader.Find("Sprites/Default"));
+            if (mat.HasProperty("_BaseColor"))
+                mat.SetColor("_BaseColor", new Color(0.45f, 0.38f, 0.32f));
+            AssetDatabase.CreateAsset(mat, RockMaterialPath);
+            return mat;
+        }
+
+        static void EnsureInBuildSettings(string path)
+        {
+            var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+            foreach (var existing in scenes)
+            {
+                if (existing.path == path)
+                    return;
+            }
+
+            scenes.Add(new EditorBuildSettingsScene(path, true));
+            EditorBuildSettings.scenes = scenes.ToArray();
         }
 
         static GameObject PlacePrefab(string path, Vector3 position, Quaternion rotation, string name)

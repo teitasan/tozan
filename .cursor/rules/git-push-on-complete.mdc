@@ -1,0 +1,15 @@
+---
+description: 作業完了後は commit して tracked remote へ push する。
+alwaysApply: true
+---
+
+# 作業完了後は Push
+
+依頼された作業が完了したら（実装と検証が終わった時点で）、ユーザーが「まだ push しない」と明示しない限り、変更を commit して **tracked remote の現在ブランチへ push** する。
+
+- commit はユーザーが改めて「commit して」と言わなくても行う。メッセージは why を 1–2 文で。
+- `git push -u origin HEAD` で足りる。force-push、別 remote、tag 作成、config 変更はしない。
+- secrets（`.env`、credentials）は commit しない。
+- 変更が無ければ commit / push しない。
+- リモート未設定や push 失敗なら、その事実を報告して止める。
+- 破壊的操作（hard reset、履歴改変）はこのルールの対象外。

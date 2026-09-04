@@ -7,6 +7,12 @@ using Object = UnityEngine.Object;
 
 namespace Tozan.Editor
 {
+    /// <summary>
+    /// Character roles (do not mix):
+    /// Casual_Male — display / future retopo only. Blender IK; legs are not Hips descendants. Never Humanoid.
+    /// UAL / UAL2 — Starter Assets Humanoid. Runtime visual prefers UAL2.
+    /// Erika — DPS Humanoid avatar on Player.prefab.
+    /// </summary>
     public static class TozanCharacterSetup
     {
         public const string CharacterPath = "Assets/Characters/Quaternius/Casual_Male.fbx";
@@ -23,11 +29,11 @@ namespace Tozan.Editor
 
         public static string EnsureReady()
         {
-            EnsureHumanoid(CharacterPath, CasualMaleMap());
+            KeepCasualMaleAsDisplayModel();
             EnsureHumanoid(UalPath, UalMap());
             EnsureHumanoid(Ual2Path, Ual2Map());
             var controllerPath = CreateStarterAnimator();
-            var playerResult = ApplyQuaterniusToDpsPlayer();
+            var playerResult = ApplyErikaToDpsPlayer();
             AssetDatabase.SaveAssets();
             return $"ok controller={controllerPath} player={playerResult}";
         }
@@ -38,15 +44,19 @@ namespace Tozan.Editor
                 return;
 
             HidePrimitiveVisual(player);
+            var leftoverCasual = player.transform.Find("Casual_Male");
+            if (leftoverCasual != null)
+                leftoverCasual.gameObject.SetActive(false);
+
             var visualPath = Ual2Path;
             var visualName = "UAL2_Mannequin";
-            var existing = player.transform.Find(visualName) ?? player.transform.Find("Casual_Male");
+            var existing = player.transform.Find(visualName);
             GameObject visual = existing != null ? existing.gameObject : null;
             if (visual == null)
             {
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(visualPath);
                 if (prefab == null)
-                    prefab = AssetDatabase.LoadAssetAtPath<GameObject>(CharacterPath);
+                    prefab = AssetDatabase.LoadAssetAtPath<GameObject>(UalPath);
                 if (prefab != null)
                 {
                     visual = (GameObject)PrefabUtility.InstantiatePrefab(prefab, player.transform);
@@ -120,30 +130,22 @@ namespace Tozan.Editor
             };
         }
 
-        static HumanBone[] CasualMaleMap()
+        static void KeepCasualMaleAsDisplayModel()
         {
-            return new[]
+            var importer = AssetImporter.GetAtPath(CharacterPath) as ModelImporter;
+            if (importer == null)
             {
-                Bone("Hips", "Hips"),
-                Bone("Abdomen", "Spine"),
-                Bone("Torso", "Chest"),
-                Bone("Neck", "Neck"),
-                Bone("Head", "Head"),
-                Bone("UpperLeg.L", "LeftUpperLeg"),
-                Bone("LowerLeg.L", "LeftLowerLeg"),
-                Bone("Foot.L", "LeftFoot"),
-                Bone("UpperLeg.R", "RightUpperLeg"),
-                Bone("LowerLeg.R", "RightLowerLeg"),
-                Bone("Foot.R", "RightFoot"),
-                Bone("Shoulder.L", "LeftShoulder"),
-                Bone("UpperArm.L", "LeftUpperArm"),
-                Bone("LowerArm.L", "LeftLowerArm"),
-                Bone("Fist.L", "LeftHand"),
-                Bone("Shoulder.R", "RightShoulder"),
-                Bone("UpperArm.R", "RightUpperArm"),
-                Bone("LowerArm.R", "RightLowerArm"),
-                Bone("Fist.R", "RightHand")
-            };
+                Debug.LogWarning("Missing model: " + CharacterPath);
+                return;
+            }
+
+            if (importer.animationType == ModelImporterAnimationType.Generic)
+                return;
+
+            importer.animationType = ModelImporterAnimationType.Generic;
+            importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+            importer.sourceAvatar = null;
+            importer.SaveAndReimport();
         }
 
         static HumanBone[] UalMap()
@@ -293,7 +295,7 @@ namespace Tozan.Editor
             controller.AddParameter(name, AnimatorControllerParameterType.Bool);
         }
 
-        static string ApplyQuaterniusToDpsPlayer()
+        static string ApplyErikaToDpsPlayer()
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
             if (prefab == null)
@@ -323,7 +325,6 @@ namespace Tozan.Editor
                 AddRig(playerModel, animator);
                 PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
                 return "patched-erika+rig";
-                return "patched";
             }
             finally
             {
