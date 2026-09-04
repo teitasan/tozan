@@ -42,6 +42,8 @@ public struct PlatformerCharacterProcessor : IKinematicCharacterProcessor<Platfo
     public RefRW<PlatformerCharacterControl> CharacterControl;
     public RefRW<PlatformerCharacterStateMachine> StateMachine;
     public RefRW<CustomGravity> CustomGravity;
+    public TozanPlatformerGeometryConfig TozanGeometry;
+    public bool HasTozanGeometry;
 
     public void PhysicsUpdate(ref PlatformerCharacterUpdateContext context, ref KinematicCharacterUpdateContext baseContext)
     {

@@ -11,6 +11,8 @@ public struct TozanPlatformerTestDrive : IComponentData
     public float3 MoveVector;
     public bool JumpHeld;
     public bool JumpPressed;
+    public bool ClimbPressed;
+    public bool CrouchPressed;
 }
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup), OrderFirst = true)]
@@ -30,6 +32,8 @@ public partial struct TozanPlatformerTestDriveSystem : ISystem
             control.ValueRW.MoveVector = drive.MoveVector;
             control.ValueRW.JumpHeld = drive.JumpHeld;
             control.ValueRW.JumpPressed = drive.JumpPressed;
+            control.ValueRW.ClimbPressed = drive.ClimbPressed;
+            control.ValueRW.CrouchPressed = drive.CrouchPressed;
         }
     }
 }

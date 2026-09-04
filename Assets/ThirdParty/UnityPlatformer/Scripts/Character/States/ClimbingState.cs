@@ -49,29 +49,24 @@ public struct ClimbingState : IPlatformerCharacterState
         
         processor.HandlePhysicsUpdatePhase1(ref context, ref baseContext, true, false);
 
-        // Quad climbing surface detection raycasts
         _foundValidClimbSurface = false;
         if (ClimbingDetection(ref context, ref baseContext, in processor, true, out LastKnownClimbNormal, out DistanceHit closestClimbableHit, out DistanceHit closestUnclimbableHit))
         {
             _foundValidClimbSurface = true;
 
-            // Adjust distance of character to surface
             characterPosition += -closestClimbableHit.Distance * closestClimbableHit.SurfaceNormal;
             characterPosition += (character.ClimbingGeometry.Radius - character.ClimbingDistanceFromSurface) * -closestClimbableHit.SurfaceNormal;
 
-            // decollide from most penetrating non-climbable hit
             if (closestUnclimbableHit.Entity != Entity.Null)
             {
                 characterPosition += -closestUnclimbableHit.Distance * closestUnclimbableHit.SurfaceNormal;
             }
 
-            // Move
             float3 climbMoveVector = math.normalizesafe(MathUtilities.ProjectOnPlane(characterControl.MoveVector, LastKnownClimbNormal)) * math.length(characterControl.MoveVector);
             float3 targetVelocity = climbMoveVector * character.ClimbingSpeed;
             CharacterControlUtilities.InterpolateVelocityTowardsTarget(ref characterBody.RelativeVelocity, targetVelocity, deltaTime, character.ClimbingMovementSharpness);
             characterBody.RelativeVelocity = MathUtilities.ProjectOnPlane(characterBody.RelativeVelocity, LastKnownClimbNormal);
 
-            // Project velocity on non-climbable obstacles
             if (processor.CharacterDataAccess.VelocityProjectionHits.Length > 0)
             {
                 bool tmpCharacterGrounded = false;
@@ -86,7 +81,6 @@ public struct ClimbingState : IPlatformerCharacterState
                     math.normalizesafe(characterBody.RelativeVelocity));
             }
             
-            // Apply velocity to position
             characterPosition += characterBody.RelativeVelocity * baseContext.Time.DeltaTime;
             
             KinematicCharacterUtilities.SetOrUpdateParentBody(ref baseContext, ref characterBody, closestClimbableHit.Entity, closestClimbableHit.Position); 
@@ -112,7 +106,6 @@ public struct ClimbingState : IPlatformerCharacterState
 
         float3 geometryCenter = GetGeometryCenter(in processor);
         
-        // Rotate
         float3 targetCharacterUp = characterBody.GroundingUp;
         if (math.lengthsq(characterControl.MoveVector) > 0f)
         {
@@ -135,7 +128,6 @@ public struct ClimbingState : IPlatformerCharacterState
         float3 cameraRight = math.mul(cameraRotation, math.right());
         float3 cameraUp = math.mul(cameraRotation, math.up());
         
-        // Only use input if the camera is pointing towards the normal
         if (math.dot(LastKnownClimbNormal, cameraFwd) < -0.05f)
         {
             moveVector = (cameraRight * inputs.Move.x) + (cameraUp * inputs.Move.y);
@@ -150,8 +142,33 @@ public struct ClimbingState : IPlatformerCharacterState
     {
         ref PlatformerCharacterControl characterControl = ref processor.CharacterControl.ValueRW;
         ref PlatformerCharacterStateMachine stateMachine = ref processor.StateMachine.ValueRW;
+        ref KinematicCharacterBody characterBody = ref processor.CharacterDataAccess.CharacterBody.ValueRW;
         
+        if (_foundValidClimbSurface &&
+            LedgeGrabState.CanGrabLedge(ref context, ref baseContext, in processor, out Entity ledgeEntity, out ColliderCastHit ledgeSurfaceHit))
+        {
+            stateMachine.TransitionToState(CharacterState.LedgeGrab, ref context, ref baseContext, in processor);
+            KinematicCharacterUtilities.SetOrUpdateParentBody(ref baseContext, ref characterBody, ledgeEntity, ledgeSurfaceHit.Position);
+            return true;
+        }
+
         if (!_foundValidClimbSurface || characterControl.JumpPressed || characterControl.DashPressed || characterControl.ClimbPressed)
+        {
+            stateMachine.TransitionToState(CharacterState.AirMove, ref context, ref baseContext, in processor);
+            return true;
+        }
+
+        if (processor.HasTozanGeometry &&
+            !TozanSurfaceProbe.PredictSurfaceRelease(
+                in processor,
+                ref context,
+                ref baseContext,
+                processor.CharacterDataAccess.LocalTransform.ValueRO.Position,
+                processor.CharacterDataAccess.LocalTransform.ValueRO.Rotation,
+                processor.CharacterDataAccess.LocalTransform.ValueRO.Scale,
+                LastKnownClimbNormal,
+                characterBody.GroundingUp,
+                processor.TozanGeometry.Probe))
         {
             stateMachine.TransitionToState(CharacterState.AirMove, ref context, ref baseContext, in processor);
             return true;
@@ -198,6 +215,7 @@ public struct ClimbingState : IPlatformerCharacterState
 
         ref KinematicCharacterProperties characterProperties = ref processor.CharacterDataAccess.CharacterProperties.ValueRW;
         ref PlatformerCharacterComponent character = ref processor.Character.ValueRW;
+        ref KinematicCharacterBody characterBody = ref processor.CharacterDataAccess.CharacterBody.ValueRW;
         ref float3 characterPosition = ref processor.CharacterDataAccess.LocalTransform.ValueRW.Position;
         ref quaternion characterRotation = ref processor.CharacterDataAccess.LocalTransform.ValueRW.Rotation;
         float characterScale = processor.CharacterDataAccess.LocalTransform.ValueRO.Scale;
@@ -215,70 +233,82 @@ public struct ClimbingState : IPlatformerCharacterState
             characterProperties.ShouldIgnoreDynamicBodies(),
             out baseContext.TmpDistanceHits);
 
-        if (baseContext.TmpDistanceHits.Length > 0)
-        {
-            closestClimbableHit.Fraction = float.MaxValue;
-            closestUnclimbableHit.Fraction = float.MaxValue;
-
-            for (int i = 0; i < baseContext.TmpDistanceHits.Length; i++)
-            {
-                DistanceHit tmpHit = baseContext.TmpDistanceHits[i];
-
-                float3 faceNormal = tmpHit.SurfaceNormal;
-
-                // This is necessary for cases where the detected hit is the edge of a triangle/plane
-                if (PhysicsUtilities.GetHitFaceNormal(baseContext.PhysicsWorld.Bodies[tmpHit.RigidBodyIndex], tmpHit.ColliderKey, out float3 tmpFaceNormal))
-                {
-                    faceNormal = tmpFaceNormal;
-                }
-
-                // Ignore back faces
-                if (math.dot(faceNormal, tmpHit.SurfaceNormal) > KinematicCharacterUtilities.Constants.DotProductSimilarityEpsilon)
-                {
-                    bool isClimbable = false;
-                    if (character.ClimbableTag.Value > CustomPhysicsBodyTags.Nothing.Value)
-                    {
-                        if ((baseContext.PhysicsWorld.Bodies[tmpHit.RigidBodyIndex].CustomTags & character.ClimbableTag.Value) > 0)
-                        {
-                            isClimbable = true;
-                        }
-                    }
-
-                    // Add virtual velocityProjection hit in direction of unclimbable hit
-                    if (isClimbable)
-                    {
-                        if (tmpHit.Fraction < closestClimbableHit.Fraction)
-                        {
-                            closestClimbableHit = tmpHit;
-                        }
-
-                        avgClimbingSurfaceNormal += faceNormal;
-                        climbableNormalsCounter++;
-                    }
-                    else
-                    {
-                        if (tmpHit.Fraction < closestUnclimbableHit.Fraction)
-                        {
-                            closestUnclimbableHit = tmpHit;
-                        }
-
-                        if (addUnclimbableHitsAsVelocityProjectionHits)
-                        {
-                            KinematicVelocityProjectionHit velProjHit = new KinematicVelocityProjectionHit(new BasicHit(tmpHit), false);
-                            processor.CharacterDataAccess.VelocityProjectionHits.Add(velProjHit);
-                        }
-                    }
-                }
-            }
-
-            if (climbableNormalsCounter > 0)
-            {
-                avgClimbingSurfaceNormal = avgClimbingSurfaceNormal / climbableNormalsCounter;
-
-                return true;
-            }
-
+        if (baseContext.TmpDistanceHits.Length == 0)
             return false;
+
+        bool useGeometry = processor.HasTozanGeometry &&
+                           processor.TozanGeometry.DetectionMode == TozanSurfaceDetectionMode.GeometryOnly;
+
+        if (useGeometry)
+        {
+            DynamicBuffer<KinematicVelocityProjectionHit> velocityProjectionHits = processor.CharacterDataAccess.VelocityProjectionHits;
+            return TozanSurfaceProbe.TryClusterClimbNormals(
+                in baseContext.TmpDistanceHits,
+                in baseContext.PhysicsWorld,
+                characterBody.GroundingUp,
+                processor.TozanGeometry.Probe,
+                out avgClimbingSurfaceNormal,
+                out closestClimbableHit,
+                out closestUnclimbableHit,
+                addUnclimbableHitsAsVelocityProjectionHits,
+                ref velocityProjectionHits);
+        }
+
+        closestClimbableHit.Fraction = float.MaxValue;
+        closestUnclimbableHit.Fraction = float.MaxValue;
+
+        for (int i = 0; i < baseContext.TmpDistanceHits.Length; i++)
+        {
+            DistanceHit tmpHit = baseContext.TmpDistanceHits[i];
+
+            float3 faceNormal = tmpHit.SurfaceNormal;
+
+            if (PhysicsUtilities.GetHitFaceNormal(baseContext.PhysicsWorld.Bodies[tmpHit.RigidBodyIndex], tmpHit.ColliderKey, out float3 tmpFaceNormal))
+            {
+                faceNormal = tmpFaceNormal;
+            }
+
+            if (math.dot(faceNormal, tmpHit.SurfaceNormal) > KinematicCharacterUtilities.Constants.DotProductSimilarityEpsilon)
+            {
+                bool isClimbable = false;
+                if (character.ClimbableTag.Value > CustomPhysicsBodyTags.Nothing.Value)
+                {
+                    if ((baseContext.PhysicsWorld.Bodies[tmpHit.RigidBodyIndex].CustomTags & character.ClimbableTag.Value) > 0)
+                    {
+                        isClimbable = true;
+                    }
+                }
+
+                if (isClimbable)
+                {
+                    if (tmpHit.Fraction < closestClimbableHit.Fraction)
+                    {
+                        closestClimbableHit = tmpHit;
+                    }
+
+                    avgClimbingSurfaceNormal += faceNormal;
+                    climbableNormalsCounter++;
+                }
+                else
+                {
+                    if (tmpHit.Fraction < closestUnclimbableHit.Fraction)
+                    {
+                        closestUnclimbableHit = tmpHit;
+                    }
+
+                    if (addUnclimbableHitsAsVelocityProjectionHits)
+                    {
+                        KinematicVelocityProjectionHit velProjHit = new KinematicVelocityProjectionHit(new BasicHit(tmpHit), false);
+                        processor.CharacterDataAccess.VelocityProjectionHits.Add(velProjHit);
+                    }
+                }
+            }
+        }
+
+        if (climbableNormalsCounter > 0)
+        {
+            avgClimbingSurfaceNormal = avgClimbingSurfaceNormal / climbableNormalsCounter;
+            return true;
         }
 
         return false;

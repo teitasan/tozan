@@ -47,10 +47,13 @@ public partial struct PlatformerCharacterPhysicsUpdateSystem : ISystem
     private EntityQuery _characterQuery;
     private PlatformerCharacterUpdateContext _context;
     private KinematicCharacterUpdateContext _baseContext;
+    private ComponentLookup<TozanPlatformerGeometryConfig> _tozanGeometryLookup;
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
+        _tozanGeometryLookup = state.GetComponentLookup<TozanPlatformerGeometryConfig>(true);
+
         _characterQuery = KinematicCharacterUtilities.GetBaseCharacterQueryBuilder()
             .WithAll<
                 PlatformerCharacterComponent,
@@ -75,6 +78,7 @@ public partial struct PlatformerCharacterPhysicsUpdateSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        _tozanGeometryLookup.Update(ref state);
         _context.OnSystemUpdate(ref state, SystemAPI.GetSingletonRW<EndSimulationEntityCommandBufferSystem.Singleton>().ValueRW.CreateCommandBuffer(state.WorldUnmanaged));
         _baseContext.OnSystemUpdate(ref state, SystemAPI.Time, SystemAPI.GetSingleton<PhysicsWorldSingleton>());
 
@@ -82,6 +86,7 @@ public partial struct PlatformerCharacterPhysicsUpdateSystem : ISystem
         {
             Context = _context,
             BaseContext = _baseContext,
+            TozanGeometryLookup = _tozanGeometryLookup,
         };
         job.ScheduleParallel();
     }
@@ -92,6 +97,7 @@ public partial struct PlatformerCharacterPhysicsUpdateSystem : ISystem
     {
         public PlatformerCharacterUpdateContext Context;
         public KinematicCharacterUpdateContext BaseContext;
+        [ReadOnly] public ComponentLookup<TozanPlatformerGeometryConfig> TozanGeometryLookup;
 
         void Execute(
             [ChunkIndexInQuery] int chunkIndex,
@@ -111,6 +117,7 @@ public partial struct PlatformerCharacterPhysicsUpdateSystem : ISystem
         {
             Context.SetChunkIndex(chunkIndex);
 
+            bool hasTozanGeometry = TozanGeometryLookup.HasComponent(entity);
             var characterProcessor = new PlatformerCharacterProcessor()
             {
                 CharacterDataAccess = new KinematicCharacterDataAccess(
@@ -128,7 +135,9 @@ public partial struct PlatformerCharacterPhysicsUpdateSystem : ISystem
                 Character = characterComponent,
                 CharacterControl = characterControl,
                 StateMachine = stateMachine,
-                CustomGravity = customGravity
+                CustomGravity = customGravity,
+                HasTozanGeometry = hasTozanGeometry,
+                TozanGeometry = hasTozanGeometry ? TozanGeometryLookup[entity] : default,
             };
 
             characterProcessor.PhysicsUpdate(ref Context, ref BaseContext);
@@ -154,10 +163,13 @@ public partial struct PlatformerCharacterVariableUpdateSystem : ISystem
     private EntityQuery _characterQuery;
     private PlatformerCharacterUpdateContext _context;
     private KinematicCharacterUpdateContext _baseContext;
+    private ComponentLookup<TozanPlatformerGeometryConfig> _tozanGeometryLookup;
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
+        _tozanGeometryLookup = state.GetComponentLookup<TozanPlatformerGeometryConfig>(true);
+
         _characterQuery = KinematicCharacterUtilities.GetBaseCharacterQueryBuilder()
             .WithAll<
                 PlatformerCharacterComponent,
@@ -181,6 +193,7 @@ public partial struct PlatformerCharacterVariableUpdateSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        _tozanGeometryLookup.Update(ref state);
         _context.OnSystemUpdate(ref state, SystemAPI.GetSingletonRW<EndSimulationEntityCommandBufferSystem.Singleton>().ValueRW.CreateCommandBuffer(state.WorldUnmanaged));
         _baseContext.OnSystemUpdate(ref state, SystemAPI.Time, SystemAPI.GetSingleton<PhysicsWorldSingleton>());
 
@@ -188,6 +201,7 @@ public partial struct PlatformerCharacterVariableUpdateSystem : ISystem
         {
             Context = _context,
             BaseContext = _baseContext,
+            TozanGeometryLookup = _tozanGeometryLookup,
         };
         job.ScheduleParallel();
     }
@@ -198,6 +212,7 @@ public partial struct PlatformerCharacterVariableUpdateSystem : ISystem
     {
         public PlatformerCharacterUpdateContext Context;
         public KinematicCharacterUpdateContext BaseContext;
+        [ReadOnly] public ComponentLookup<TozanPlatformerGeometryConfig> TozanGeometryLookup;
 
         void Execute(
             [ChunkIndexInQuery] int chunkIndex,
@@ -217,6 +232,7 @@ public partial struct PlatformerCharacterVariableUpdateSystem : ISystem
         {
             Context.SetChunkIndex(chunkIndex);
 
+            bool hasTozanGeometry = TozanGeometryLookup.HasComponent(entity);
             var characterProcessor = new PlatformerCharacterProcessor()
             {
                 CharacterDataAccess = new KinematicCharacterDataAccess(
@@ -234,7 +250,9 @@ public partial struct PlatformerCharacterVariableUpdateSystem : ISystem
                 Character = characterComponent,
                 CharacterControl = characterControl,
                 StateMachine = stateMachine,
-                CustomGravity = customGravity
+                CustomGravity = customGravity,
+                HasTozanGeometry = hasTozanGeometry,
+                TozanGeometry = hasTozanGeometry ? TozanGeometryLookup[entity] : default,
             };
 
             characterProcessor.VariableUpdate(ref Context, ref BaseContext);

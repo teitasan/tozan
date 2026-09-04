@@ -40,7 +40,16 @@ namespace Tozan.Tests
 
             var world = World.DefaultGameObjectInjectionWorld;
             Assert.IsNotNull(world);
-            Assert.AreNotEqual(Entity.Null, FindCharacter(world.EntityManager));
+            var character = FindCharacter(world.EntityManager);
+            Assert.AreNotEqual(Entity.Null, character);
+
+            var geometryConfigType = PlatformerTestHelpers.FindType("TozanPlatformerGeometryConfig");
+            Assert.IsNotNull(geometryConfigType, "Tozan geometry configuration type");
+            Assert.IsTrue(world.EntityManager.HasComponent(character, geometryConfigType),
+                "NaturalRockSandbox player prefab must bake geometry mode; tests must not add it as a fallback");
+            var geometryConfig = PlatformerTestHelpers.GetComponent(world.EntityManager, character, geometryConfigType);
+            var detectionMode = geometryConfigType.GetField("DetectionMode").GetValue(geometryConfig);
+            Assert.AreEqual("GeometryOnly", detectionMode.ToString());
         }
 
         [UnityTest]
@@ -126,29 +135,107 @@ namespace Tozan.Tests
             Assert.GreaterOrEqual(pos.y, 2.0f, "should be on OverhangShelf Lip top (~2.5), " + report);
         }
 
-        static void PlaceFallingAtUnmarkedShelf(EntityManager em, Entity character)
+        [UnityTest]
+        [Timeout(90000)]
+        public IEnumerator NaturalRockSandbox_GeometryClimb_VerticalWall()
         {
-            ZeroBodyVelocity(em, character);
-            var lt = em.GetComponentData<LocalTransform>(character);
-            // Rock_OverhangShelf / Lip: unmarked boxes. Lip front z=4.95, top y=2.495, x=-5.5.
-            // Standing capsule radius 0.3: z must stay < 4.65 or CanGrabLedge bails on overlap
-            // and the character falls through, then walks under the lip on the ground.
-            // Shelf_Low is only ~1.07m, so hang puts feet on the ground and drops immediately.
-            // Official detection point is local (0, 1.084, 0.5). Fall into the lip, not jump onto it.
-            lt.Position = new float3(-5.5f, 1.42f, 4.58f);
-            lt.Rotation = quaternion.identity;
-            em.SetComponentData(character, lt);
-            SetBodyVelocity(em, character, new float3(0f, -1.2f, 0.8f));
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
+            yield return PlatformerTestHelpers.WaitForState("GroundMove", 10f);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            var em = world.EntityManager;
+            var character = PlatformerTestHelpers.FindCharacter(em);
+            PlatformerTestHelpers.EnsureGeometryConfig(em, character);
+
+            PlatformerTestHelpers.PlaceCharacter(em, character,
+                new float3(0f, 1.1f, 1.15f), quaternion.identity, float3.zero);
+            EnsureTestDrive(em, character);
+
+            yield return DriveUntilState(em, character, "Climbing", 4f, new float3(0f, 0f, 0.4f), false, climbPressed: true);
+            yield return HoldState(em, character, "Climbing", 15, new float3(0f, 0.4f, 0f), climbPressed: false);
+
+            var pos = em.GetComponentData<LocalTransform>(character).Position;
+            Assert.Greater(pos.y, 1.05f, "geometry climb should raise character on vertical wall fixture");
+
+            SetDrive(em, character, float3.zero, false, false, climbPressed: true);
+            yield return PlatformerTestHelpers.WaitForState("AirMove", 3f);
         }
 
-        static IEnumerator DriveUntilState(EntityManager em, Entity character, string expected, float seconds, float3 move, bool jumpPressed)
+        [UnityTest]
+        [Timeout(90000)]
+        public IEnumerator NaturalRockSandbox_GeometryClimb_IrregularMeshCollider()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
+            yield return PlatformerTestHelpers.WaitForState("GroundMove", 10f);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            var em = world.EntityManager;
+            var character = PlatformerTestHelpers.FindCharacter(em);
+            PlatformerTestHelpers.EnsureGeometryConfig(em, character);
+            PlatformerTestHelpers.PlaceCharacter(em, character,
+                new float3(0f, 1.1f, 20.85f), quaternion.identity, float3.zero);
+            EnsureTestDrive(em, character);
+
+            yield return DriveUntilState(em, character, "Climbing", 4f, float3.zero, false, climbPressed: true);
+            yield return HoldState(em, character, "Climbing", 15, new float3(0f, 0.4f, 0f));
+
+            var pos = em.GetComponentData<LocalTransform>(character).Position;
+            Assert.IsTrue(math.all(math.isfinite(pos)), "irregular MeshCollider climb must not produce NaN");
+            Assert.Greater(pos.y, 1.05f, "geometry climb should work on the unmarked irregular MeshCollider fixture");
+
+            SetDrive(em, character, float3.zero, false, false, climbPressed: true);
+            yield return PlatformerTestHelpers.WaitForState("AirMove", 3f);
+        }
+
+        [UnityTest]
+        [Timeout(90000)]
+        public IEnumerator NaturalRockSandbox_Mantle_NoTeleportSnap()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
+            yield return PlatformerTestHelpers.WaitForState("GroundMove", 10f);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            var em = world.EntityManager;
+            var character = PlatformerTestHelpers.FindCharacter(em);
+            PlatformerTestHelpers.PlaceFallingAtUnmarkedShelf(em, character);
+            EnsureTestDrive(em, character);
+            yield return DriveUntilState(em, character, "LedgeGrab", 5f, new float3(0f, 0f, 0.4f), false);
+            yield return HoldState(em, character, "LedgeGrab", 8, float3.zero);
+
+            var hangPos = em.GetComponentData<LocalTransform>(character).Position;
+            var maxStep = 0f;
+            for (var i = 0; i < 60; i++)
+            {
+                // Keep the deterministic harness press alive for a few fixed
+                // steps so the state-machine update cannot miss its edge.
+                var requestMantle = i < 4 && ReadCurrentState(em, character) == "LedgeGrab";
+                SetDrive(em, character, float3.zero, false, requestMantle);
+                yield return null;
+                var state = ReadCurrentState(em, character);
+                if (state == "GroundMove")
+                    break;
+                var pos = em.GetComponentData<LocalTransform>(character).Position;
+                maxStep = math.max(maxStep, math.distance(pos, hangPos));
+                hangPos = pos;
+            }
+
+            Assert.Less(maxStep, 0.35f, "mantle should advance in small steps, not one-frame teleport");
+            Assert.AreEqual("GroundMove", ReadCurrentState(em, character));
+        }
+
+        static void PlaceFallingAtUnmarkedShelf(EntityManager em, Entity character)
+        {
+            PlatformerTestHelpers.PlaceFallingAtUnmarkedShelf(em, character);
+        }
+
+        static IEnumerator DriveUntilState(EntityManager em, Entity character, string expected, float seconds, float3 move, bool jumpPressed, bool climbPressed = false)
         {
             var end = Time.time + seconds;
             var states = "";
             var frames = 0;
             while (Time.time < end)
             {
-                SetDrive(em, character, move, false, jumpPressed);
+                SetDrive(em, character, move, false, jumpPressed, climbPressed);
                 var state = ReadCurrentState(em, character);
                 if (frames < 40)
                     states += state + ",";
@@ -162,12 +249,12 @@ namespace Tozan.Tests
             Assert.Fail("Timed out waiting for " + expected + " (trail=" + states + " last=" + ReadCurrentState(em, character) + " pos=" + pos + ")");
         }
 
-        static IEnumerator HoldState(EntityManager em, Entity character, string expected, int frames, float3 move)
+        static IEnumerator HoldState(EntityManager em, Entity character, string expected, int frames, float3 move, bool climbPressed = false)
         {
             var trail = "";
             for (var i = 0; i < frames; i++)
             {
-                SetDrive(em, character, move, false, false);
+                SetDrive(em, character, move, false, false, climbPressed);
                 var state = ReadCurrentState(em, character);
                 trail += state + ",";
                 if (state != expected)
@@ -267,13 +354,15 @@ namespace Tozan.Tests
             SetBodyVelocity(em, character, float3.zero);
         }
 
-        static void SetDrive(EntityManager em, Entity character, float3 move, bool jumpHeld, bool jumpPressed)
+        static void SetDrive(EntityManager em, Entity character, float3 move, bool jumpHeld, bool jumpPressed, bool climbPressed = false, bool crouchPressed = false)
         {
             var type = FindType("TozanPlatformerTestDrive");
             var boxed = System.Activator.CreateInstance(type);
             type.GetField("MoveVector").SetValue(boxed, move);
             type.GetField("JumpHeld").SetValue(boxed, jumpHeld);
             type.GetField("JumpPressed").SetValue(boxed, jumpPressed);
+            type.GetField("ClimbPressed").SetValue(boxed, climbPressed);
+            type.GetField("CrouchPressed").SetValue(boxed, crouchPressed);
             SetComponent(em, character, type, boxed);
         }
 

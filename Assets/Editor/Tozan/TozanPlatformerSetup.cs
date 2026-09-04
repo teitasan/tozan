@@ -139,6 +139,8 @@ namespace Tozan.Editor
             if (characterPrefab == null || playerPrefab == null || cameraPrefab == null)
                 throw new System.InvalidOperationException("Platformer prefabs missing under Assets/ThirdParty/UnityPlatformer/Prefabs");
 
+            EnsureNaturalRockGeometryAuthoring(characterPrefab);
+
             var start = GameObject.Find("TraversalStart");
             if (start == null)
             {
@@ -157,6 +159,20 @@ namespace Tozan.Editor
             auth.CharacterPrefabEntity = characterPrefab;
             auth.CameraPrefabEntity = cameraPrefab;
             auth.PlayerPrefabEntity = playerPrefab;
+        }
+
+        public static void EnsureNaturalRockGeometryAuthoring(GameObject characterPrefab)
+        {
+            if (characterPrefab == null)
+                return;
+
+            var auth = characterPrefab.GetComponent<TozanPlatformerGeometryAuthoring>();
+            if (auth == null)
+                auth = characterPrefab.AddComponent<TozanPlatformerGeometryAuthoring>();
+            auth.name = "TozanPlatformerGeometry";
+            auth.Config = TozanPlatformerGeometryConfig.DefaultNaturalRock;
+            EditorUtility.SetDirty(characterPrefab);
+            AssetDatabase.SaveAssets();
         }
     }
 }
