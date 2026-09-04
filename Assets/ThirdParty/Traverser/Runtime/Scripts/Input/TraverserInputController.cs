@@ -87,9 +87,24 @@ namespace Traverser
             inputMovement = value.ReadValue<Vector2>();
         }
 
-        public void OnLook(InputAction.CallbackContext value)
+        public void OnMove(InputValue value)
         {
-            inputLook = value.ReadValue<Vector2>();
+            inputMovement = value.Get<Vector2>();
+        }
+
+        public void OnLook(InputValue value)
+        {
+            inputLook = value.Get<Vector2>();
+        }
+
+        public void OnJump(InputValue value)
+        {
+            SetButton(InputInteraction.NorthButton, value.isPressed);
+        }
+
+        public void OnSprint(InputValue value)
+        {
+            SetButton(InputInteraction.RunButton, value.isPressed);
         }
 
         public void OnWestButton(InputAction.CallbackContext value)
@@ -129,6 +144,14 @@ namespace Traverser
                 inputInteraction |= InputInteraction.RunButton;
             else if (value.canceled)
                 inputInteraction &= ~InputInteraction.RunButton;
+        }
+
+        void SetButton(InputInteraction button, bool pressed)
+        {
+            if (pressed)
+                inputInteraction |= button;
+            else
+                inputInteraction &= ~button;
         }
 
         // --------------------------------

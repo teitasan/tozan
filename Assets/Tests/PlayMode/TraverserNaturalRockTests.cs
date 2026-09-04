@@ -21,6 +21,11 @@ namespace Tozan.Tests
             Assert.IsNotNull(GameObject.Find("TraverserPlayer"), "STEP 14 uses TraverserPlayer");
             Assert.IsNull(GameObject.Find("PlayerModel"), "DPS player must not be in the natural-rock gate");
 
+            var player = GameObject.Find("TraverserPlayer");
+            Assert.IsNotNull(player.transform.Find("PlayerCameraRoot"), "third-person camera target");
+            Assert.IsNotNull(GameObject.Find("TraverserFollowCamera"), "Cinemachine follow camera");
+            Assert.IsNotNull(FindComponent(player, "PlayerInput"), "PlayerInput wired to Traverser");
+
             foreach (var t in rocks.GetComponentsInChildren<Transform>(true))
             {
                 Assert.AreNotEqual("Vault", t.gameObject.tag, t.name);
@@ -36,6 +41,23 @@ namespace Tozan.Tests
                     Assert.AreNotEqual("Point", n, t.name);
                 }
             }
+        }
+
+        [UnityTest]
+        public IEnumerator NaturalRockSandbox_ThirdPersonCameraFollowsPlayer()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
+            yield return null;
+            yield return new WaitForFixedUpdate();
+            yield return null;
+
+            var player = GameObject.Find("TraverserPlayer");
+            var cam = Camera.main;
+            Assert.IsNotNull(player);
+            Assert.IsNotNull(cam);
+            Assert.Greater(Vector3.Distance(cam.transform.position, player.transform.position), 1.5f,
+                "Main Camera must sit behind the player, not at the feet");
+            Assert.Greater(cam.transform.position.y, 0.8f);
         }
 
         [UnityTest]

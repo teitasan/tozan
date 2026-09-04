@@ -185,7 +185,7 @@ namespace Traverser
             state = TraverserState.Create();
             snapshotState = TraverserState.Create();
             lastContactTransform = TraverserTransform.Get(Vector3.zero, Quaternion.identity);
-            hitColliders = new Collider[3];
+            hitColliders = new Collider[16];
             groundRay = new Ray();
 
             state.currentCollision.position = transform.position;

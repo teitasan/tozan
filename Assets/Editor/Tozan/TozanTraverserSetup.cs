@@ -1,8 +1,10 @@
 using Traverser;
+using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
+using UnityEngine.InputSystem;
 using Object = UnityEngine.Object;
 
 namespace Tozan.Editor
@@ -14,6 +16,8 @@ namespace Tozan.Editor
         public const string ClimbingDataPath = DataFolder + "/TozanClimbingData.asset";
         public const string LocomotionDataPath = DataFolder + "/TozanLocomotionData.asset";
         public const string ParkourDataPath = DataFolder + "/TozanParkourData.asset";
+        const string InputActionsPath = "Assets/StarterAssets/InputSystem/StarterAssets.inputactions";
+        const string FollowCameraName = "TraverserFollowCamera";
 
         public static GameObject CreatePlayer(Vector3 position)
         {
@@ -72,7 +76,61 @@ namespace Tozan.Editor
             var parkour = player.AddComponent<TraverserParkourAbility>();
             parkour.parkourData = AssetDatabase.LoadAssetAtPath<TraverserParkourData>(ParkourDataPath);
 
+            EnsurePlayerPresentation(player);
             return player;
+        }
+
+        public static void EnsurePlayerPresentation(GameObject player)
+        {
+            if (player == null)
+                return;
+
+            var cameraRoot = player.transform.Find("PlayerCameraRoot");
+            if (cameraRoot == null)
+            {
+                var rootGo = new GameObject("PlayerCameraRoot");
+                cameraRoot = rootGo.transform;
+                cameraRoot.SetParent(player.transform, false);
+                cameraRoot.localPosition = new Vector3(0f, 1.375f, 0f);
+                cameraRoot.localRotation = Quaternion.identity;
+            }
+
+            var camCtrl = player.GetComponent<TraverserCameraController>();
+            if (camCtrl == null)
+                camCtrl = player.AddComponent<TraverserCameraController>();
+            camCtrl.cameraTarget = cameraRoot;
+
+            var follow = GameObject.Find(FollowCameraName);
+            if (follow == null)
+                follow = new GameObject(FollowCameraName);
+
+            var cmCam = follow.GetComponent<CinemachineCamera>();
+            if (cmCam == null)
+                cmCam = follow.AddComponent<CinemachineCamera>();
+            cmCam.Follow = cameraRoot;
+            cmCam.Priority = 20;
+
+            var orbit = follow.GetComponent<CinemachineThirdPersonFollow>();
+            if (orbit == null)
+                orbit = follow.AddComponent<CinemachineThirdPersonFollow>();
+            orbit.CameraDistance = 4.0f;
+            orbit.ShoulderOffset = new Vector3(0.5f, 0.0f, 0.0f);
+            orbit.VerticalArmLength = 0.4f;
+            orbit.CameraSide = 1.0f;
+            orbit.Damping = new Vector3(0.1f, 0.25f, 0.3f);
+
+            var actions = AssetDatabase.LoadAssetAtPath<InputActionAsset>(InputActionsPath);
+            var playerInput = player.GetComponent<PlayerInput>();
+            if (playerInput == null)
+                playerInput = player.AddComponent<PlayerInput>();
+            if (actions != null)
+                playerInput.actions = actions;
+            playerInput.defaultActionMap = "Player";
+            playerInput.notificationBehavior = PlayerNotifications.SendMessages;
+
+            var loco = player.GetComponent<TraverserLocomotionAbility>();
+            if (loco != null && Camera.main != null)
+                loco.cameraTransform = Camera.main.transform;
         }
 
         static void AttachUal2Visual(GameObject player)
