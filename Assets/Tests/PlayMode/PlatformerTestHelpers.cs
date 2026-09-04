@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Physics;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -167,5 +168,96 @@ namespace Tozan.Tests
             }
             return null;
         }
+
+        public static float3 ReadBodyVelocity(EntityManager em, Entity character)
+        {
+            var bodyType = FindType("Unity.CharacterController.KinematicCharacterBody");
+            if (bodyType != null && em.HasComponent(character, bodyType))
+            {
+                var boxed = GetComponent(em, character, bodyType);
+                var field = bodyType.GetField("RelativeVelocity");
+                if (field != null)
+                    return (float3)field.GetValue(boxed);
+            }
+            return float3.zero;
+        }
+
+        public static float3 ReadCameraRight(EntityManager em)
+        {
+            var playerType = FindType("PlatformerPlayer");
+            if (playerType == null)
+                return math.right();
+
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly(playerType));
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            if (entities.Length == 0)
+                return math.right();
+
+            var player = GetComponent(em, entities[0], playerType);
+            var cameraField = playerType.GetField("ControlledCamera");
+            if (cameraField == null)
+                return math.right();
+
+            var camera = (Entity)cameraField.GetValue(player);
+            if (camera == Entity.Null || !em.HasComponent<Unity.Transforms.LocalTransform>(camera))
+                return math.right();
+
+            return math.mul(em.GetComponentData<Unity.Transforms.LocalTransform>(camera).Rotation, math.right());
+        }
+
+        public static int ReadHybridClipIndex()
+        {
+            foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsInactive.Include))
+            {
+                if (animator == null || animator.gameObject.name.IndexOf("CharacterMesh") < 0)
+                    continue;
+                return animator.GetInteger("ClipIndex");
+            }
+            return -1;
+        }
+
+        public static float ReadHybridAnimatorSpeed()
+        {
+            foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsInactive.Include))
+            {
+                if (animator == null || animator.gameObject.name.IndexOf("CharacterMesh") < 0)
+                    continue;
+                return animator.speed;
+            }
+            return -1f;
+        }
+
+        public static bool TryFindVerticalWallAabb(EntityManager em, out Aabb wallAabb)
+        {
+            wallAabb = default;
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly<PhysicsWorldSingleton>());
+            if (query.IsEmptyIgnoreFilter)
+                return false;
+
+            var physicsWorld = query.GetSingleton<PhysicsWorldSingleton>();
+            foreach (var body in physicsWorld.StaticBodies)
+            {
+                var aabb = body.CalculateAabb();
+                var size = aabb.Max - aabb.Min;
+                var center = (aabb.Max + aabb.Min) * 0.5f;
+                if (size.x >= 11f && size.y >= 7f && size.z > 0.4f && size.z < 0.8f &&
+                    math.abs(center.x) < 0.25f && center.y > 3.5f && center.y < 4.5f &&
+                    center.z > 1.3f && center.z < 1.8f)
+                {
+                    wallAabb = aabb;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static void PlaceAtVerticalWall(EntityManager em, Entity character, float height = 1.1f)
+        {
+            // Keep the character just inside the reliable distance-query band
+            // used by the official capsule geometry.
+            PlaceCharacter(em, character, new float3(0f, height, 1.3f), quaternion.identity, float3.zero);
+        }
+
     }
 }

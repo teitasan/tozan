@@ -106,11 +106,12 @@ public struct ClimbingState : IPlatformerCharacterState
 
         float3 geometryCenter = GetGeometryCenter(in processor);
         
-        float3 targetCharacterUp = characterBody.GroundingUp;
-        if (math.lengthsq(characterControl.MoveVector) > 0f)
-        {
-            targetCharacterUp = math.normalizesafe(MathUtilities.ProjectOnPlane(characterControl.MoveVector, LastKnownClimbNormal));
-        }
+        // Keep the character upright relative to the world while climbing.
+        // Using MoveVector here would roll the capsule ninety degrees when
+        // the player strafes horizontally across a wall.
+        float3 targetCharacterUp = math.normalizesafe(
+            MathUtilities.ProjectOnPlane(math.up(), LastKnownClimbNormal),
+            math.up());
         quaternion targetRotation = quaternion.LookRotationSafe(-LastKnownClimbNormal, targetCharacterUp);
         quaternion smoothedRotation = math.slerp(characterRotation, targetRotation, MathUtilities.GetSharpnessInterpolant(character.ClimbingRotationSharpness, deltaTime));
         MathUtilities.SetRotationAroundPoint(ref characterRotation, ref characterPosition, geometryCenter, smoothedRotation);
@@ -124,18 +125,35 @@ public struct ClimbingState : IPlatformerCharacterState
 
     public void GetMoveVectorFromPlayerInput(in PlatformerPlayerInputs inputs, quaternion cameraRotation, out float3 moveVector)
     {
-        float3 cameraFwd = math.mul(cameraRotation, math.forward());
+        moveVector = GetWallRelativeMoveVector(inputs.Move, LastKnownClimbNormal, cameraRotation);
+    }
+
+    /// <summary>
+    /// Wall-tangent WASD: W/S = up/down on the surface, A/D = left/right along the surface.
+    /// W/S follow world-up projected onto the wall; A/D follow the camera's
+    /// screen-right projected onto the wall. Never pushes away from the wall.
+    /// </summary>
+    public static float3 GetWallRelativeMoveVector(float2 moveInput, float3 climbNormal)
+    {
+        return GetWallRelativeMoveVector(moveInput, climbNormal, quaternion.identity);
+    }
+
+    public static float3 GetWallRelativeMoveVector(float2 moveInput, float3 climbNormal, quaternion cameraRotation)
+    {
+        float3 normal = math.normalizesafe(climbNormal, float3.zero);
+        if (math.lengthsq(normal) < 1e-6f || math.lengthsq(moveInput) < 1e-6f)
+            return float3.zero;
+
+        float3 wallUp = math.normalizesafe(MathUtilities.ProjectOnPlane(math.up(), normal), float3.zero);
+        if (math.lengthsq(wallUp) < 1e-6f)
+            wallUp = math.normalizesafe(MathUtilities.ProjectOnPlane(math.forward(), normal), math.right());
+
         float3 cameraRight = math.mul(cameraRotation, math.right());
-        float3 cameraUp = math.mul(cameraRotation, math.up());
-        
-        if (math.dot(LastKnownClimbNormal, cameraFwd) < -0.05f)
-        {
-            moveVector = (cameraRight * inputs.Move.x) + (cameraUp * inputs.Move.y);
-        }
-        else
-        {
-            moveVector = (cameraRight * inputs.Move.x) + (cameraFwd * inputs.Move.y);
-        }
+        float3 wallRight = math.normalizesafe(MathUtilities.ProjectOnPlane(cameraRight, normal), float3.zero);
+        if (math.lengthsq(wallRight) < 1e-6f)
+            wallRight = math.normalizesafe(math.cross(wallUp, normal), math.right());
+        float3 moveVector = (wallUp * moveInput.y) + (wallRight * moveInput.x);
+        return MathUtilities.ProjectOnPlane(moveVector, normal);
     }
 
     public bool DetectTransitions(ref PlatformerCharacterUpdateContext context, ref KinematicCharacterUpdateContext baseContext, in PlatformerCharacterProcessor processor)

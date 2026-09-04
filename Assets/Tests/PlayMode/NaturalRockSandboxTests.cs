@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -133,6 +134,31 @@ namespace Tozan.Tests
             Debug.Log("STEP15 LedgeStandUp " + report);
             Assert.AreEqual("GroundMove", last, "official stand-up should land on the unmarked shelf. " + report);
             Assert.GreaterOrEqual(pos.y, 2.0f, "should be on OverhangShelf Lip top (~2.5), " + report);
+        }
+
+        [UnityTest]
+        [Timeout(90000)]
+        public IEnumerator NaturalRockSandbox_VerticalWallFixture_IsLargeAndUnmarked()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
+            yield return WaitForState("GroundMove", 10f);
+
+            // NaturalRockSandbox is streamed into an Entities SubScene, so the
+            // authoring GameObject is not present at runtime. Validate the
+            // baked static physics body instead of searching the hierarchy.
+            Assert.IsTrue(PlatformerTestHelpers.TryFindVerticalWallAabb(
+                World.DefaultGameObjectInjectionWorld.EntityManager, out var wallAabb),
+                "Rock_VerticalWall confirmation fixture must be baked into the static physics world");
+
+            var size = wallAabb.Max - wallAabb.Min;
+            Assert.GreaterOrEqual(size.x, 11f, "confirmation wall width should be ~12m");
+            Assert.GreaterOrEqual(size.y, 7f, "confirmation wall height should be ~8m");
+            Assert.Greater(size.z, 0.4f, "confirmation wall must have a solid collision depth");
+            Assert.Less(size.z, 0.8f, "confirmation wall depth should remain the thin test fixture");
+
+            // Front face z = center.z - depth/2 ≈ 1.275 for existing climb placement.
+            Assert.AreEqual(1.275f, wallAabb.Min.z, 0.08f,
+                "wall front face position for climb tests");
         }
 
         [UnityTest]

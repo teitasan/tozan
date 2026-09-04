@@ -1,6 +1,5 @@
 using System.Collections;
 using NUnit.Framework;
-using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -17,6 +16,9 @@ namespace Tozan.Tests
     /// </summary>
     public class NaturalRockSandboxInputTests
     {
+        const float MinClimbDelta = 0.08f;
+        const float MaxWallNormalDrift = 0.2f;
+
         static Keyboard s_sharedKeyboard;
         Keyboard _keyboard;
 
@@ -24,17 +26,37 @@ namespace Tozan.Tests
         public void SetUp()
         {
             if (s_sharedKeyboard == null || !s_sharedKeyboard.added)
-                s_sharedKeyboard = InputSystem.AddDevice<Keyboard>();
+                s_sharedKeyboard = InputSystem.GetDevice<Keyboard>() ?? InputSystem.AddDevice<Keyboard>();
             _keyboard = s_sharedKeyboard;
+
+            // The Unity Test Runner keeps devices created by earlier PlayMode
+            // runs in the editor process. A stale keyboard multiplies every
+            // keyboard binding during action resolution and can exceed the
+            // Input System's per-binding control-count limit.
+            var ignoreFailingMessages = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = true;
+            try
+            {
+                for (var i = InputSystem.devices.Count - 1; i >= 0; i--)
+                {
+                    if (InputSystem.devices[i] is Keyboard keyboard && keyboard != _keyboard)
+                        InputSystem.RemoveDevice(keyboard);
+                }
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = ignoreFailingMessages;
+            }
+
             _keyboard.MakeCurrent();
-            InputSystem.QueueStateEvent(_keyboard, new KeyboardState());
+            QueueKeyboardState(new KeyboardState());
         }
 
         [TearDown]
         public void TearDown()
         {
             if (_keyboard != null)
-                InputSystem.QueueStateEvent(_keyboard, new KeyboardState());
+                QueueKeyboardState(new KeyboardState());
         }
 
         [UnityTest]
@@ -77,8 +99,6 @@ namespace Tozan.Tests
             PressKey(Key.Space);
             for (var i = 0; i < 90; i++)
             {
-                // Let the fixed-step input bridge consume the press before
-                // releasing the synthetic keyboard state.
                 if (i > 0)
                     ReleaseAllKeys();
                 yield return null;
@@ -103,16 +123,18 @@ namespace Tozan.Tests
             var character = PlatformerTestHelpers.FindCharacter(em);
             PlatformerTestHelpers.EnsureGeometryConfig(em, character);
             PlatformerTestHelpers.ClearControlOverrides(em, character);
+            PlatformerTestHelpers.PlaceAtVerticalWall(em, character);
 
-            // Rock_VerticalWall front face ~ z=1.275; place the standing
-            // capsule at its contact point so the climb edge is not consumed
-            // by a corrective overlap step.
-            PlatformerTestHelpers.PlaceCharacter(em, character,
-                new float3(0f, 1.1f, 0.98f), quaternion.identity, float3.zero);
-
-            // Start climbing with the real climb binding while stationary;
-            // apply W only after the state transition so ground movement
-            // cannot carry the character away from the wall first.
+            // Approach with S first, then press F once the capsule is against
+            // the face. Holding both from the initial placement can consume
+            // the official WasPressedThisFrame edge before contact exists.
+            for (var i = 0; i < 8; i++)
+            {
+                PressKey(Key.S);
+                yield return new WaitForFixedUpdate();
+            }
+            ReleaseAllKeys();
+            yield return new WaitForFixedUpdate();
             yield return HoldKeysUntilState(em, character, "Climbing", 4f, Key.F);
             yield return HoldStateWithInput(em, character, "Climbing", 15, Key.W);
 
@@ -120,6 +142,67 @@ namespace Tozan.Tests
             Assert.Greater(climbPos.y, 1.05f, "should move upward while climbing");
 
             yield return ReleaseClimbAndWaitForExit(em, character, 3f);
+        }
+
+        [UnityTest]
+        [Timeout(90000)]
+        public IEnumerator InputSystem_GeometryClimb_WallRelative_WASD()
+        {
+            // Use one real-input session so the four directions are verified
+            // against the same camera, wall normal, and active climb state.
+            yield return EnterClimbingOnVerticalWall(startHeight: 1.1f);
+
+            var em = World.DefaultGameObjectInjectionWorld.EntityManager;
+            var character = PlatformerTestHelpers.FindCharacter(em);
+            var start = em.GetComponentData<Unity.Transforms.LocalTransform>(character).Position;
+
+            yield return HoldStateWithInput(em, character, "Climbing", 30, Key.W);
+            var afterW = em.GetComponentData<Unity.Transforms.LocalTransform>(character).Position;
+
+            yield return HoldStateWithInput(em, character, "Climbing", 2, Key.None);
+            yield return HoldStateWithInput(em, character, "Climbing", 30, Key.S);
+            var afterS = em.GetComponentData<Unity.Transforms.LocalTransform>(character).Position;
+
+            yield return HoldStateWithInput(em, character, "Climbing", 2, Key.None);
+            yield return HoldStateWithInput(em, character, "Climbing", 30, Key.A);
+            var afterA = em.GetComponentData<Unity.Transforms.LocalTransform>(character).Position;
+
+            yield return HoldStateWithInput(em, character, "Climbing", 2, Key.None);
+            yield return HoldStateWithInput(em, character, "Climbing", 30, Key.D);
+            var afterD = em.GetComponentData<Unity.Transforms.LocalTransform>(character).Position;
+
+            var cameraRight = PlatformerTestHelpers.ReadCameraRight(em);
+            var wallRight = math.normalizesafe(new float3(cameraRight.x, 0f, cameraRight.z), math.right());
+            var report = "start=" + start + " W=" + afterW + " S=" + afterS + " A=" + afterA + " D=" + afterD
+                + " cameraRight=" + cameraRight + " wallRight=" + wallRight;
+            Assert.Greater(afterW.y - start.y, MinClimbDelta, "W should ascend on the wall. " + report);
+            Assert.Less(afterS.y - afterW.y, -MinClimbDelta, "S should descend on the wall. " + report);
+            Assert.Less(math.dot(afterA - afterS, wallRight), -MinClimbDelta,
+                "A should move toward screen-left along the wall. " + report);
+            Assert.Greater(math.dot(afterD - afterA, wallRight), MinClimbDelta,
+                "D should move toward screen-right along the wall. " + report);
+            Assert.Less(math.abs(afterD.z - start.z), MaxWallNormalDrift,
+                "WASD should keep the character on the wall face. " + report);
+        }
+
+        [UnityTest]
+        [Timeout(90000)]
+        public IEnumerator InputSystem_GeometryClimb_ClimbingAnimationClipAndVelocity()
+        {
+            yield return EnterClimbingOnVerticalWall();
+
+            var em = World.DefaultGameObjectInjectionWorld.EntityManager;
+            var character = PlatformerTestHelpers.FindCharacter(em);
+
+            yield return HoldStateWithInput(em, character, "Climbing", 20, Key.W);
+
+            var clip = PlatformerTestHelpers.ReadHybridClipIndex();
+            var speed = PlatformerTestHelpers.ReadHybridAnimatorSpeed();
+            var velocity = PlatformerTestHelpers.ReadBodyVelocity(em, character);
+            var report = "clip=" + clip + " speed=" + speed + " velocity=" + velocity;
+            Assert.AreEqual(10, clip, "ClimbingMoveClip (ClipIndex 10) must play while climbing. " + report);
+            Assert.IsTrue(math.lengthsq(velocity) > 0.01f || speed > 0.05f,
+                "climbing with W must show motion via velocity or animator speed. " + report);
         }
 
         [UnityTest]
@@ -140,31 +223,61 @@ namespace Tozan.Tests
             yield return WaitForState(em, character, "AirMove", 2f);
         }
 
+        IEnumerator EnterClimbingOnVerticalWall(float startHeight = 1.1f)
+        {
+            yield return LoadSandboxAndWaitForGroundMove();
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            var em = world.EntityManager;
+            var character = PlatformerTestHelpers.FindCharacter(em);
+            PlatformerTestHelpers.EnsureGeometryConfig(em, character);
+            PlatformerTestHelpers.ClearControlOverrides(em, character);
+            PlatformerTestHelpers.PlaceAtVerticalWall(em, character, startHeight);
+
+            // Approach with S first, then press F once the capsule is against
+            // the face. Holding both from the initial placement can consume
+            // the official WasPressedThisFrame edge before contact exists.
+            for (var i = 0; i < 8; i++)
+            {
+                PressKey(Key.S);
+                yield return new WaitForFixedUpdate();
+            }
+            ReleaseAllKeys();
+            yield return new WaitForFixedUpdate();
+            yield return HoldKeysUntilState(em, character, "Climbing", 4f, Key.F);
+            // Consume the start-climb press before the movement direction is
+            // changed. The subsequent wall traversal must be driven by WASD.
+            ReleaseAllKeys();
+            yield return new WaitForFixedUpdate();
+        }
+
         IEnumerator LoadSandboxAndWaitForGroundMove()
         {
             yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
             yield return PlatformerTestHelpers.WaitForState("GroundMove", 10f);
 
-            // Apply the queued neutral state after the new player input map is
-            // enabled. This prevents a key held by the preceding test from
-            // suppressing the next WasPressedThisFrame edge.
             ReleaseAllKeys();
-            yield return null;
+            yield return new WaitForFixedUpdate();
         }
 
         void PressKey(Key key)
         {
-            InputSystem.QueueStateEvent(_keyboard, new KeyboardState(key));
+            QueueKeyboardState(new KeyboardState(key));
         }
 
         void PressKeys(params Key[] keys)
         {
-            InputSystem.QueueStateEvent(_keyboard, new KeyboardState(keys));
+            QueueKeyboardState(new KeyboardState(keys));
         }
 
         void ReleaseAllKeys()
         {
-            InputSystem.QueueStateEvent(_keyboard, new KeyboardState());
+            QueueKeyboardState(new KeyboardState());
+        }
+
+        void QueueKeyboardState(KeyboardState state)
+        {
+            InputSystem.QueueStateEvent(_keyboard, state);
         }
 
         IEnumerator HoldKeysUntilState(EntityManager em, Entity character, string expected, float seconds, params Key[] keys)
@@ -173,13 +286,14 @@ namespace Tozan.Tests
             while (Time.time < end)
             {
                 PressKeys(keys);
+                yield return new WaitForFixedUpdate();
                 if (PlatformerTestHelpers.ReadCurrentState(em, character) == expected)
                     yield break;
-                yield return null;
             }
 
             var position = em.GetComponentData<Unity.Transforms.LocalTransform>(character).Position;
-            Assert.Fail("Timed out waiting for " + expected + " last=" + PlatformerTestHelpers.ReadCurrentState(em, character) + " pos=" + position);
+            Assert.Fail("Timed out waiting for " + expected + " last=" + PlatformerTestHelpers.ReadCurrentState(em, character)
+                + " pos=" + position);
         }
 
         IEnumerator ReleaseClimbAndWaitForExit(EntityManager em, Entity character, float seconds)
@@ -187,9 +301,6 @@ namespace Tozan.Tests
             var end = Time.time + seconds;
             while (Time.time < end)
             {
-                // Keep the real climb binding held until the fixed-step bridge
-                // consumes the edge. A transient AirMove may immediately land
-                // on the sandbox floor, so accept either post-climb state.
                 PressKey(Key.F);
                 var state = PlatformerTestHelpers.ReadCurrentState(em, character);
                 if (state == "AirMove" || state == "GroundMove")
@@ -217,15 +328,15 @@ namespace Tozan.Tests
         {
             for (var i = 0; i < frames; i++)
             {
-                if (heldKey != Key.None)
-                {
-                    InputSystem.QueueStateEvent(_keyboard, new KeyboardState(heldKey));
-                }
+                if (heldKey == Key.None)
+                    ReleaseAllKeys();
+                else
+                    PressKey(heldKey);
 
+                yield return new WaitForFixedUpdate();
                 var state = PlatformerTestHelpers.ReadCurrentState(em, character);
                 if (state != expected)
                     Assert.Fail("lost " + expected + " after " + i + " frames (last=" + state + ")");
-                yield return null;
             }
         }
     }

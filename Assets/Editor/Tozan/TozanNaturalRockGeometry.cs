@@ -17,7 +17,8 @@ namespace Tozan.Editor
         {
             EnsureMeshFolder();
 
-            CreateBoxRock("Rock_VerticalWall", new Vector3(0f, 1.25f, 1.55f), new Vector3(3.2f, 2.5f, 0.55f),
+            // Confirmation wall: front face stays at z≈1.275 for existing climb tests.
+            CreateBoxRock("Rock_VerticalWall", new Vector3(0f, 4f, 1.55f), new Vector3(12f, 8f, 0.55f),
                 Quaternion.identity, parent, rockMat);
 
             CreateBoxRock("Rock_Slope80", new Vector3(-10f, 2.05f, 6f), new Vector3(3.2f, 4.1f, 0.55f),

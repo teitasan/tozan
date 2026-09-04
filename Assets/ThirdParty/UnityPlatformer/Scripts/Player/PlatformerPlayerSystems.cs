@@ -26,7 +26,8 @@ public partial class PlatformerPlayerInputsSystem : SystemBase
         base.OnStartRunning();
         
         _inputActions = new PlatformerInputActions();
-        _inputActions.Enable();
+        // The ECS player consumes gameplay actions only. Keep the generated UI
+        // map disabled until a UI system needs to subscribe to it.
         _inputActions.GameplayMap.Enable();
         _defaultActionsMap = _inputActions.GameplayMap;
 
