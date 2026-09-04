@@ -1,0 +1,38 @@
+---
+description: Tozan の Unity 6.6 プロトタイプ方針と Editor 自動化ルール。Unity 作業では必ず適用する。
+alwaysApply: true
+---
+
+# Tozan workflow
+
+基準は Unity **6000.6.0f1 / URP**。詳細は `AGENTS.md`。Editor 操作は `.cursor/rules/unity-cli.mdc` と `unity command`。
+
+## 手動操作を要求しない
+
+Unity Editor で人間による手動操作を要求しないこと。
+Hierarchy、Inspector、Scene 設定、Prefab、Component、
+Package、Build Settings などの操作は、
+Unity CLI / Unity Pipeline / Editor API / C# で行うこと。
+「Inspector で設定してください」と回答する前に、
+必ず UnityEditor API または CLI で自動化できないか検討すること。
+変更後は必ず Editor を実行し、
+Console Error を確認すること。
+可能なら Play Mode Test または Edit Mode Test を作成して検証すること。
+
+`unity status` が `ready` なら `.unity` / `.prefab` / `.asset` を手編集しない。
+
+## スコープ
+
+STEP 7（箱だけの登攀）までが採用判断。地形・植生はその後。
+Nature Renderer / MicroSplat / Gaia / Final IK / 有料 Parkour / ECS Character Controller は入れない。
+
+明示指示なしに STEP 3 以降へ進まない。
+
+## CLI 注意
+
+- `unity eval` はない。`unity command eval` を使う。
+- `eval` の timeout はミリ秒（省略時 5000）。CLI の `--timeout` は秒で同名を食う。
+
+```bash
+unity command eval -- --code 'return Application.unityVersion;' --timeout 60000
+```
