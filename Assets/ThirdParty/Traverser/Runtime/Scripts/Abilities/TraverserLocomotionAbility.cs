@@ -659,8 +659,13 @@ namespace Traverser
 
             if (currentJumpSpeed <= 0.0f)
             {
+                if (state != LocomotionAbilityState.Falling)
+                {
+                    state = LocomotionAbilityState.Falling;
+                    if (locomotionData != null)
+                        animationController.animator.CrossFade(locomotionData.fallTransitionAnimation.animationStateName, locomotionData.fallTransitionAnimation.transitionDuration);
+                }
                 isApex = true;
-                state = LocomotionAbilityState.Falling;
             }
 
             controller.locomotionVerticalOverride = true;

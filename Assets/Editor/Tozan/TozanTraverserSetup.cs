@@ -265,89 +265,149 @@ namespace Tozan.Editor
             EditorUtility.SetDirty(data);
         }
 
+        static TraverserAnimationController.AnimationData Anim(string stateName, float duration)
+        {
+            return new TraverserAnimationController.AnimationData
+            {
+                animationStateName = stateName,
+                transitionDuration = duration
+            };
+        }
+
         static void FillLocomotionDummyAnims(TraverserLocomotionData data)
         {
             if (data == null)
                 return;
-            if (!string.IsNullOrEmpty(data.locomotionONAnimation.animationStateName))
-                return;
             var trans = IdleTransition();
-            var anim = IdleAnim();
             data.fallToRollTransitionData = trans;
             data.hardLandingTransitionData = trans;
-            data.fallTransitionAnimation = anim;
-            data.jumpAnimation = anim;
-            data.jumpForwardAnimation = anim;
-            data.locomotionONAnimation = anim;
-            data.locomotionOFFAnimation = anim;
-            data.fallToLandAnimation = anim;
-            data.fallToRunAnimation = anim;
+            data.fallTransitionAnimation = Anim("Fall", 0.15f);
+            data.jumpAnimation = Anim("Jump", 0.05f);
+            data.jumpForwardAnimation = Anim("JumpForward", 0.05f);
+            data.locomotionONAnimation = Anim("Locomotion", 0.15f);
+            data.locomotionOFFAnimation = Anim("Idle", 0.2f);
+            data.fallToLandAnimation = Anim("Land", 0.05f);
+            data.fallToRunAnimation = Anim("LandRun", 0.05f);
             EditorUtility.SetDirty(data);
         }
+
+        const string DpsAnimFolder = "Assets/ThirdParty/DynamicParkourSystem/Model/Animations/";
 
         static void EnsureAnimator()
         {
             var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
             if (controller == null)
-            {
                 controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
-                EnsureBool(controller, "Move");
-                EnsureFloat(controller, "Speed");
-                EnsureFloat(controller, "Heading");
-                EnsureFloat(controller, "DirectionX");
-                EnsureFloat(controller, "FreeHangWeight");
-                EnsureFloat(controller, "IKLeftFootWeight");
-                EnsureFloat(controller, "IKRightFootWeight");
-                EnsureFloat(controller, "IKLeftHandWeight");
-                EnsureFloat(controller, "IKRightHandWeight");
 
-                var root = controller.layers[0].stateMachine;
-                var idle = root.AddState("Idle");
-                root.defaultState = idle;
-            }
+            EnsureBool(controller, "Move");
+            EnsureFloat(controller, "Speed");
+            EnsureFloat(controller, "Heading");
+            EnsureFloat(controller, "DirectionX");
+            EnsureFloat(controller, "FreeHangWeight");
+            EnsureFloat(controller, "IKLeftFootWeight");
+            EnsureFloat(controller, "IKRightFootWeight");
+            EnsureFloat(controller, "IKLeftHandWeight");
+            EnsureFloat(controller, "IKRightHandWeight");
 
-            AssignStandingIdleClip(controller);
+            var sm = controller.layers[0].stateMachine;
+            var idle = GetOrAddState(sm, "Idle", new Vector3(200f, 0f, 0f));
+            var loco = GetOrAddState(sm, "Locomotion", new Vector3(200f, 120f, 0f));
+            var jump = GetOrAddState(sm, "Jump", new Vector3(480f, 0f, 0f));
+            var jumpFwd = GetOrAddState(sm, "JumpForward", new Vector3(480f, 80f, 0f));
+            var fall = GetOrAddState(sm, "Fall", new Vector3(480f, 160f, 0f));
+            var land = GetOrAddState(sm, "Land", new Vector3(760f, 0f, 0f));
+            var landRun = GetOrAddState(sm, "LandRun", new Vector3(760f, 80f, 0f));
+            sm.defaultState = idle;
+
+            idle.motion = LoadDpsClip("Idle.fbx", "Idle");
+            jump.motion = LoadDpsClip("Jump.fbx", "Jump");
+            jumpFwd.motion = LoadDpsClip("Big Jump.fbx", "Big Jump");
+            fall.motion = LoadDpsClip("Fall Idle.fbx", "Fall A Loop");
+            land.motion = LoadDpsClip("Falling To Landing.fbx", "Falling To Landing");
+            landRun.motion = LoadDpsClip("Land To Run Forward.fbx", "Fall A Land To Run Forward");
+
+            var walk = LoadDpsClip("Walk.fbx", "Walk");
+            var jog = LoadDpsClip("Jog Forward.fbx", "Jog Forward");
+            var run = LoadDpsClip("Run.fbx", "Run");
+            var blend = GetOrAddBlendTree(controller, "LocomotionBlend");
+            blend.blendType = BlendTreeType.Simple1D;
+            blend.blendParameter = "Speed";
+            blend.useAutomaticThresholds = false;
+            blend.children = new ChildMotion[0];
+            if (walk != null)
+                blend.AddChild(walk, 1.0f);
+            if (jog != null)
+                blend.AddChild(jog, 3.9f);
+            if (run != null)
+                blend.AddChild(run, 5.5f);
+            loco.motion = blend;
+
+            EnsureBoolTransition(idle, loco, AnimatorConditionMode.If, "Move", false, 0.15f);
+            EnsureBoolTransition(loco, idle, AnimatorConditionMode.IfNot, "Move", false, 0.2f);
+            EnsureBoolTransition(land, idle, AnimatorConditionMode.IfNot, "Move", true, 0.15f);
+            EnsureBoolTransition(land, loco, AnimatorConditionMode.If, "Move", true, 0.15f);
+            EnsureBoolTransition(landRun, idle, AnimatorConditionMode.IfNot, "Move", true, 0.15f);
+            EnsureBoolTransition(landRun, loco, AnimatorConditionMode.If, "Move", true, 0.15f);
+
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
         }
 
-        static void AssignStandingIdleClip(AnimatorController controller)
+        static AnimatorState GetOrAddState(AnimatorStateMachine sm, string name, Vector3 position)
         {
-            var clip = FindStandingIdleClip();
-            if (clip == null)
-                return;
-            foreach (var child in controller.layers[0].stateMachine.states)
+            foreach (var child in sm.states)
             {
-                if (child.state.name == "Idle")
-                    child.state.motion = clip;
+                if (child.state.name == name)
+                    return child.state;
             }
+            return sm.AddState(name, position);
         }
 
-        static AnimationClip FindStandingIdleClip()
+        static BlendTree GetOrAddBlendTree(AnimatorController controller, string name)
         {
-            string[] paths =
+            var path = AssetDatabase.GetAssetPath(controller);
+            foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(path))
             {
-                "Assets/Characters/UAL/AnimationLibrary_Unity_Standard.fbx",
-                "Assets/ThirdParty/DynamicParkourSystem/Model/Animations/Idle.fbx"
-            };
-            AnimationClip exact = null;
-            AnimationClip fuzzy = null;
-            foreach (var path in paths)
-            {
-                foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(path))
-                {
-                    var clip = obj as AnimationClip;
-                    if (clip == null || clip.name.StartsWith("__"))
-                        continue;
-                    if (clip.name == "Idle")
-                        exact = clip;
-                    else if (fuzzy == null && clip.name.IndexOf("Idle") >= 0)
-                        fuzzy = clip;
-                }
-                if (exact != null)
-                    return exact;
+                var existing = obj as BlendTree;
+                if (existing != null && existing.name == name)
+                    return existing;
             }
-            return exact != null ? exact : fuzzy;
+            var blend = new BlendTree { name = name, hideFlags = HideFlags.HideInHierarchy };
+            AssetDatabase.AddObjectToAsset(blend, controller);
+            return blend;
+        }
+
+        static void EnsureBoolTransition(AnimatorState from, AnimatorState to, AnimatorConditionMode mode, string param, bool exitTime, float duration)
+        {
+            foreach (var t in from.transitions)
+            {
+                if (t.destinationState == to)
+                    return;
+            }
+            var tr = from.AddTransition(to);
+            tr.hasExitTime = exitTime;
+            tr.hasFixedDuration = true;
+            tr.duration = duration;
+            if (exitTime)
+                tr.exitTime = 0.85f;
+            tr.AddCondition(mode, 0, param);
+        }
+
+        static AnimationClip LoadDpsClip(string fileName, string clipName)
+        {
+            AnimationClip named = null;
+            AnimationClip any = null;
+            foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(DpsAnimFolder + fileName))
+            {
+                var clip = obj as AnimationClip;
+                if (clip == null || clip.name.StartsWith("__"))
+                    continue;
+                if (clip.name == clipName)
+                    named = clip;
+                if (any == null)
+                    any = clip;
+            }
+            return named != null ? named : any;
         }
 
         static void EnsureFloat(AnimatorController controller, string name)

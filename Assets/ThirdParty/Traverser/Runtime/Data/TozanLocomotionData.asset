@@ -29,23 +29,23 @@ MonoBehaviour:
     targetOffset: 0
     forceTarget: 0
   fallTransitionAnimation:
-    animationStateName: Idle
-    transitionDuration: 0.1
+    animationStateName: Fall
+    transitionDuration: 0.15
   jumpAnimation:
-    animationStateName: Idle
-    transitionDuration: 0.1
+    animationStateName: Jump
+    transitionDuration: 0.05
   jumpForwardAnimation:
-    animationStateName: Idle
-    transitionDuration: 0.1
+    animationStateName: JumpForward
+    transitionDuration: 0.05
   locomotionONAnimation:
-    animationStateName: Idle
-    transitionDuration: 0.1
+    animationStateName: Locomotion
+    transitionDuration: 0.15
   locomotionOFFAnimation:
     animationStateName: Idle
-    transitionDuration: 0.1
+    transitionDuration: 0.2
   fallToLandAnimation:
-    animationStateName: Idle
-    transitionDuration: 0.1
+    animationStateName: Land
+    transitionDuration: 0.05
   fallToRunAnimation:
-    animationStateName: Idle
-    transitionDuration: 0.1
+    animationStateName: LandRun
+    transitionDuration: 0.05

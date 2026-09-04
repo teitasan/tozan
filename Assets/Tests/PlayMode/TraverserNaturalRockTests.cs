@@ -94,6 +94,8 @@ namespace Tozan.Tests
             yield return Hold(player, new Vector2(0f, 1f), east: false, north: false, 1.0f);
             var walked = player.transform.position.z - start.z;
             Assert.Greater(walked, 0.4f, "WASD should cover more than a crawl in 1s, moved " + walked);
+            Assert.IsTrue(animator.GetCurrentAnimatorStateInfo(0).IsName("Locomotion"),
+                "walk should play Locomotion, state=" + AnimatorStateName(animator));
 
             var jumpStartY = player.transform.position.y;
             var peakY = jumpStartY;
@@ -106,6 +108,9 @@ namespace Tozan.Tests
                     SetInput(player, Vector2.zero, east: false, north: false);
             }
             Assert.Greater(peakY - jumpStartY, 0.4f, "Space should hop, peakDelta=" + (peakY - jumpStartY));
+            var jumpState = AnimatorStateName(animator);
+            Assert.IsTrue(jumpState == "Jump" || jumpState == "JumpForward" || jumpState == "Fall" || jumpState == "Land",
+                "jump should leave Idle, state=" + jumpState);
         }
 
         [UnityTest]
@@ -252,6 +257,17 @@ namespace Tozan.Tests
 
             if (stateName == "PullUp" || (hung && player.transform.position.y > hangY + 0.8f && stateName == "Suspended"))
                 mantled = true;
+        }
+
+        static string AnimatorStateName(Animator animator)
+        {
+            var info = animator.GetCurrentAnimatorStateInfo(0);
+            foreach (var name in new[] { "Idle", "Locomotion", "Jump", "JumpForward", "Fall", "Land", "LandRun" })
+            {
+                if (info.IsName(name))
+                    return name;
+            }
+            return "unknown";
         }
 
         static void SetInput(GameObject player, Vector2 movement, bool east, bool north)
