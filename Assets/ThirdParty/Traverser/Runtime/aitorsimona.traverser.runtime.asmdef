@@ -1,0 +1,17 @@
+{
+    "name": "aitorsimona.traverser",
+    "rootNamespace": "Traverser",
+    "references": [
+        "Unity.InputSystem",
+        "Unity.Animation.Rigging"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

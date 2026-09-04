@@ -195,10 +195,13 @@ namespace Tozan.Editor
             var start = new GameObject("TraversalStart");
             start.transform.SetPositionAndRotation(new Vector3(0f, 0.1f, 0.2f), Quaternion.identity);
 
-            var playerRoot = PlaceDpsPlayer(start.transform.position);
+            var playerRoot = TozanTraverserSetup.CreatePlayer(start.transform.position);
             playerRoot.transform.rotation = Quaternion.identity;
             RemoveCamerasOutside(playerRoot);
             SetupMainCamera(false);
+            var loco = playerRoot.GetComponent<Traverser.TraverserLocomotionAbility>();
+            if (loco != null && Camera.main != null)
+                loco.cameraTransform = Camera.main.transform;
             EnsureInBuildSettings(NaturalScenePath);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, NaturalScenePath);

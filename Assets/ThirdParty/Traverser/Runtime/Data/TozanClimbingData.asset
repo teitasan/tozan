@@ -1,0 +1,120 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 367ea2cd9327bc94eb30537f4350cbfe, type: 3}
+  m_Name: TozanClimbingData
+  m_EditorClassIdentifier: aitorsimona.traverser::Traverser.TraverserClimbingData
+  mountTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  jumpHangTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  jumpHangShortTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  dropDownTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  HopUpTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  HopRightTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  HopLeftTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  HopDownTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  dismountTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  pullUpTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  jumpBackTransitionData:
+    transitionAnim: Idle
+    targetAnim: Idle
+    triggerTransitionAnim: 
+    triggerTargetAnim: 
+    contactOffset: 0
+    targetOffset: 0
+    forceTarget: 0
+  fallTransitionAnimation:
+    animationStateName: Idle
+    transitionDuration: 0.1
+  locomotionOnAnimation:
+    animationStateName: Idle
+    transitionDuration: 0.1
+  ledgeIdleAnimation:
+    animationStateName: Idle
+    transitionDuration: 0.1
+  fallLoopAnimation:
+    animationStateName: Idle
+    transitionDuration: 0.1
+  ledgeRightAnimation:
+    animationStateName: Idle
+    transitionDuration: 0.1
+  ledgeLeftAnimation:
+    animationStateName: Idle
+    transitionDuration: 0.1

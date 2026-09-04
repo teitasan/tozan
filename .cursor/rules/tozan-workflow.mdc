@@ -23,8 +23,9 @@ Console Error を確認すること。
 
 ## スコープ
 
-本命の採用判断は STEP 13（DPS 専用 Prefab / Vault タグ / HandlePoints なしの自然形状）。
-STEP 7 の箱シーンは「DPS 作者が想定した環境で動くか」の確認。
+本命の採用判断は Marker / HandlePoint / Bake なしの自然形状 Traversal。
+候補条件: 任意 Mesh を runtime で形状解析し、ledge を検出できること。「climbing」「parkour」と書いてあるだけでは入れない。Bake/Marker 方式は候補から外す。
+STEP 14 は Traverser を `NaturalRockSandbox` にぶつけた結果、Marker なしでは Grab できない。既製 Traversal 探しは止め、次は自前 Geometry Detector + Animation Rigging + 既製 Animation/Motion Warping。
 Nature Renderer / MicroSplat / Gaia / Final IK / 有料 Parkour / ECS Character Controller は入れない。
 
 明示指示なしに STEP 3 以降へ進まない。
