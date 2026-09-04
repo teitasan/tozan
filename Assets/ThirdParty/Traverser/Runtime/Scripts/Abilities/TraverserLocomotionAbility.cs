@@ -300,7 +300,7 @@ namespace Traverser
             Vector2 inputDirection = abilityController.inputController.GetInputMovement();
 
             // --- Activate or update jump ---
-            HandleJump(speed);
+            HandleJump(speed, deltaTime);
             speed = DampenSpeed(speed);
 
             // --- If stick is released, do not update velocity as this would stop the character immediately ---
@@ -450,6 +450,7 @@ namespace Traverser
                         currentJumpSpeed = 0.0f;
                         wasJumping = false;
                         state = LocomotionAbilityState.Landing;
+                        controller.locomotionVerticalOverride = false;
                         break;
                     }
                 }
@@ -481,12 +482,16 @@ namespace Traverser
             wasJumping = false;
             northJumpLocked = false;
             state = LocomotionAbilityState.Moving;
+            if (controller != null)
+                controller.locomotionVerticalOverride = false;
         }
 
         public void OnEnter()
         {
             currentJumpSpeed = 0.0f;
             wasJumping = false;
+            if (controller != null)
+                controller.locomotionVerticalOverride = false;
 
             FindFootIKTarget(animationController.rightFootPos, ref rightFootIKTransform);
             FindFootIKTarget(animationController.leftFootPos, ref leftFootIKTransform);
@@ -613,12 +618,12 @@ namespace Traverser
             currentRotationSpeed = Mathf.Clamp(currentRotationSpeed, -rotationSpeed, rotationSpeed);
         }
 
-        public void HandleJump(float speed)
+        public void HandleJump(float speed, float deltaTime)
         {
             if (!abilityController.inputController.GetInputButtonNorth())
                 northJumpLocked = false;
 
-            var onGround = controller.isGrounded || controller.isCapsuleGrounded || controller.previous.isGrounded;
+            var onGround = controller.isCapsuleGrounded || controller.isGrounded;
 
             if (!wasJumping && !northJumpLocked
                 && abilityController.inputController.GetInputButtonNorth()
@@ -628,41 +633,54 @@ namespace Traverser
                 state = LocomotionAbilityState.Jumping;
                 wasJumping = true;
                 northJumpLocked = true;
-                fIKOn = false;
                 isApex = false;
                 currentTime = 0.0f;
                 currentJumpSpeed = initialJumpSpeed;
 
-                if (speed < walkSpeed)
-                    animationController.animator.CrossFade(locomotionData.jumpAnimation.animationStateName, locomotionData.jumpAnimation.transitionDuration);
-                else
-                    animationController.animator.CrossFade(locomotionData.jumpForwardAnimation.animationStateName, locomotionData.jumpForwardAnimation.transitionDuration);
+                if (locomotionData != null)
+                {
+                    if (speed < walkSpeed)
+                        animationController.animator.CrossFade(locomotionData.jumpAnimation.animationStateName, locomotionData.jumpAnimation.transitionDuration);
+                    else
+                        animationController.animator.CrossFade(locomotionData.jumpForwardAnimation.animationStateName, locomotionData.jumpForwardAnimation.transitionDuration);
+                }
             }
 
-            if ((state == LocomotionAbilityState.Jumping || state == LocomotionAbilityState.Falling) && wasJumping)
+            if (!wasJumping)
             {
-                currentTime += Time.deltaTime;
+                controller.locomotionVerticalOverride = false;
+                return;
+            }
 
-                if (currentTime >= jumpTime)
-                {
-                    currentJumpSpeed = Mathf.MoveTowards(currentJumpSpeed, 0.0f, 40.0f * Time.deltaTime);
-                    isApex = true;
-                    if (currentJumpSpeed <= 0.0f)
-                        state = LocomotionAbilityState.Falling;
-                }
+            currentTime += deltaTime;
+            currentJumpSpeed += Physics.gravity.y * deltaTime;
+            if (currentJumpSpeed < -maxJumpSpeed)
+                currentJumpSpeed = -maxJumpSpeed;
 
-                if ((currentTime > jumpTime && onGround) || currentTime > 1.25f)
+            if (currentJumpSpeed <= 0.0f)
+            {
+                isApex = true;
+                state = LocomotionAbilityState.Falling;
+            }
+
+            controller.locomotionVerticalOverride = true;
+
+            // Ground probe stays overlapping the floor for the first ~0.25m. Do not land on the way up.
+            var landed = currentJumpSpeed <= 0.0f && onGround && currentTime > 0.1f;
+            if (landed || currentTime > 2.5f)
+            {
+                if (locomotionData != null)
                 {
                     if (speed < walkSpeed)
                         animationController.animator.CrossFade(locomotionData.fallToLandAnimation.animationStateName, locomotionData.fallToLandAnimation.transitionDuration);
                     else
                         animationController.animator.CrossFade(locomotionData.fallToRunAnimation.animationStateName, locomotionData.fallToRunAnimation.transitionDuration);
-
-                    fIKOn = true;
-                    state = LocomotionAbilityState.Moving;
-                    wasJumping = false;
-                    currentJumpSpeed = 0.0f;
                 }
+
+                state = LocomotionAbilityState.Moving;
+                wasJumping = false;
+                currentJumpSpeed = 0.0f;
+                controller.locomotionVerticalOverride = false;
             }
         }
 

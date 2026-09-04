@@ -10,6 +10,10 @@ namespace Traverser
         [Header("Controller")]
         [Tooltip("Whether or not gravity will be applied to the controller. Deactivated during transitions.")]
         public bool gravityEnabled = true;
+
+        // TOZAN: locomotion owns vertical velocity during jump/fall. Snapshot must not fight it.
+        [HideInInspector]
+        public bool locomotionVerticalOverride;
         [Tooltip("How much will given displacement be increased, bigger stepping increases prediction reach at the cost of precision (void space). Can be overwriten by abilities.")]
         [Range(1.0f, 10.0f)]
         public float stepping = 1.0f;
@@ -217,8 +221,12 @@ namespace Traverser
             state.desiredDisplacement = Vector3.zero;
 
             // --- Apply gravity ---
-            if (currentGravity)
+            // Physics.gravity * dt is treated as a downward velocity (~9.8 m/s). Jump kinematic
+            // cannot beat that unless locomotion owns the vertical axis for the hop.
+            if (currentGravity && !locomotionVerticalOverride)
                 state.currentCollision.dynamicsDisplacement = Physics.gravity * deltaTime * stepping;
+            else
+                state.currentCollision.dynamicsDisplacement = Vector3.zero;
 
             // --- Compute final displacement/position and move character controller ---
             Vector3 desiredDisplacement = state.currentCollision.kinematicDisplacement + state.currentCollision.dynamicsDisplacement;

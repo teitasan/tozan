@@ -94,6 +94,18 @@ namespace Tozan.Tests
             yield return Hold(player, new Vector2(0f, 1f), east: false, north: false, 1.0f);
             var walked = player.transform.position.z - start.z;
             Assert.Greater(walked, 0.4f, "WASD should cover more than a crawl in 1s, moved " + walked);
+
+            var jumpStartY = player.transform.position.y;
+            var peakY = jumpStartY;
+            SetInput(player, Vector2.zero, east: false, north: true);
+            for (var i = 0; i < 20; i++)
+            {
+                yield return new WaitForFixedUpdate();
+                peakY = Mathf.Max(peakY, player.transform.position.y);
+                if (i == 2)
+                    SetInput(player, Vector2.zero, east: false, north: false);
+            }
+            Assert.Greater(peakY - jumpStartY, 0.4f, "Space should hop, peakDelta=" + (peakY - jumpStartY));
         }
 
         [UnityTest]
