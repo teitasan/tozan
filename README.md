@@ -19,7 +19,7 @@ Unity 6.6 / URP の登山・登攀プロトタイプ。Godot 版 `climbing_physi
 
 ### 壁面移動（確認用縦切り）
 
-`Rock_VerticalWall`（幅 12m / 高さ 8m / 正面 z≈1.275）で、F 登攀 → WASD 壁面移動 → 登攀モーション表示までを Unity 実行で確認できる。
+`Rock_VerticalWall`（幅 12m / 高さ 8m / 正面 z≈1.275）で、WASD で壁へ接近 → 自動で壁面移動 → 登攀モーション表示までを Unity 実行で確認できる。
 
 - **入力:** `ClimbingState.GetWallRelativeMoveVector` — W/S = 壁面上の上/下、A/D = カメラ画面基準の接線方向の左右。壁法線方向の入力は生成しない。
 - **アニメ:** 公式 `PlatformerCharacterAnimation` の `ClimbingMoveClip=10`。移動中は velocity に応じて `animator.speed` が変化。
@@ -41,7 +41,7 @@ unity command run_tests -- --mode PlayMode --filter NaturalRockSandbox
 ```
 
 - `NaturalRockSandboxTests` — TestDrive による回帰（ledge / mantle / 大壁 fixture）
-- `NaturalRockSandboxInputTests` — **Input System キューイベント**（F 登攀、W/S/A/D 壁面移動、ClipIndex 10 / velocity）
+- `NaturalRockSandboxInputTests` — **Input System キューイベント**（WASD 自動壁面移動、Space ジャンプ、Shift ダッシュ、W/S/A/D 壁面移動、ClipIndex 10 / velocity）
 
 ### 出典
 

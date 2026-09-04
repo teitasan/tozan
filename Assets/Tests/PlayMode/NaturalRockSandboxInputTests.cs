@@ -114,6 +114,37 @@ namespace Tozan.Tests
 
         [UnityTest]
         [Timeout(90000)]
+        public IEnumerator InputSystem_SpaceJumps_And_LeftShiftDashes()
+        {
+            yield return LoadSandboxAndWaitForGroundMove();
+
+            var em = World.DefaultGameObjectInjectionWorld.EntityManager;
+            var character = PlatformerTestHelpers.FindCharacter(em);
+            PlatformerTestHelpers.ClearControlOverrides(em, character);
+
+            var start = em.GetComponentData<Unity.Transforms.LocalTransform>(character).Position;
+            PressKey(Key.Space);
+            yield return WaitForState(em, character, "AirMove", 2f);
+
+            // Space must be the jump action, not a climb-only control.
+            ReleaseAllKeys();
+            for (var i = 0; i < 6; i++)
+                yield return new WaitForFixedUpdate();
+
+            var afterJump = em.GetComponentData<Unity.Transforms.LocalTransform>(character).Position;
+            Assert.Greater(afterJump.y, start.y + 0.01f,
+                "Space should launch the character. start=" + start + " afterJump=" + afterJump);
+
+            yield return WaitForState(em, character, "GroundMove", 5f);
+            ReleaseAllKeys();
+            yield return new WaitForFixedUpdate();
+
+            PressKey(Key.LeftShift);
+            yield return WaitForState(em, character, "Dashing", 1f);
+        }
+
+        [UnityTest]
+        [Timeout(90000)]
         public IEnumerator InputSystem_GeometryClimb_VerticalWall_HoldAndRelease()
         {
             yield return LoadSandboxAndWaitForGroundMove();
@@ -125,17 +156,8 @@ namespace Tozan.Tests
             PlatformerTestHelpers.ClearControlOverrides(em, character);
             PlatformerTestHelpers.PlaceAtVerticalWall(em, character);
 
-            // Approach with S first, then press F once the capsule is against
-            // the face. Holding both from the initial placement can consume
-            // the official WasPressedThisFrame edge before contact exists.
-            for (var i = 0; i < 8; i++)
-            {
-                PressKey(Key.S);
-                yield return new WaitForFixedUpdate();
-            }
-            ReleaseAllKeys();
-            yield return new WaitForFixedUpdate();
-            yield return HoldKeysUntilState(em, character, "Climbing", 4f, Key.F);
+            // Auto-climb: walk into the wall with S (toward the face). No F press.
+            yield return HoldKeysUntilState(em, character, "Climbing", 4f, Key.S);
             yield return HoldStateWithInput(em, character, "Climbing", 15, Key.W);
 
             var climbPos = em.GetComponentData<Unity.Transforms.LocalTransform>(character).Position;
@@ -234,19 +256,8 @@ namespace Tozan.Tests
             PlatformerTestHelpers.ClearControlOverrides(em, character);
             PlatformerTestHelpers.PlaceAtVerticalWall(em, character, startHeight);
 
-            // Approach with S first, then press F once the capsule is against
-            // the face. Holding both from the initial placement can consume
-            // the official WasPressedThisFrame edge before contact exists.
-            for (var i = 0; i < 8; i++)
-            {
-                PressKey(Key.S);
-                yield return new WaitForFixedUpdate();
-            }
-            ReleaseAllKeys();
-            yield return new WaitForFixedUpdate();
-            yield return HoldKeysUntilState(em, character, "Climbing", 4f, Key.F);
-            // Consume the start-climb press before the movement direction is
-            // changed. The subsequent wall traversal must be driven by WASD.
+            // Auto-climb: walk into the wall with S. No F press.
+            yield return HoldKeysUntilState(em, character, "Climbing", 4f, Key.S);
             ReleaseAllKeys();
             yield return new WaitForFixedUpdate();
         }
@@ -301,7 +312,7 @@ namespace Tozan.Tests
             var end = Time.time + seconds;
             while (Time.time < end)
             {
-                PressKey(Key.F);
+                PressKey(Key.Space);
                 var state = PlatformerTestHelpers.ReadCurrentState(em, character);
                 if (state == "AirMove" || state == "GroundMove")
                     yield break;

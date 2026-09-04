@@ -170,7 +170,7 @@ public struct ClimbingState : IPlatformerCharacterState
             return true;
         }
 
-        if (!_foundValidClimbSurface || characterControl.JumpPressed || characterControl.DashPressed || characterControl.ClimbPressed)
+        if (!_foundValidClimbSurface || characterControl.JumpPressed || characterControl.DashPressed)
         {
             stateMachine.TransitionToState(CharacterState.AirMove, ref context, ref baseContext, in processor);
             return true;
@@ -215,6 +215,43 @@ public struct ClimbingState : IPlatformerCharacterState
         processor.SetCapsuleGeometry(character.StandingGeometry.ToCapsuleGeometry());
 
         return canStart;
+    }
+
+    /// <summary>
+    /// Auto-climb entry: requires meaningful movement into a detected climbable surface.
+    /// Idle beside a wall, or strafing parallel to it, must not start climbing.
+    /// </summary>
+    public static bool ShouldAutoStartClimbing(
+        ref PlatformerCharacterUpdateContext context,
+        ref KinematicCharacterUpdateContext baseContext,
+        in PlatformerCharacterProcessor processor,
+        float3 moveVector)
+    {
+        const float minMoveSq = 0.04f;
+        const float minIntoWallDot = 0.25f;
+
+        if (math.lengthsq(moveVector) < minMoveSq)
+            return false;
+
+        ref PlatformerCharacterComponent character = ref processor.Character.ValueRW;
+
+        processor.SetCapsuleGeometry(character.ClimbingGeometry.ToCapsuleGeometry());
+        bool foundSurface = ClimbingDetection(
+            ref context,
+            ref baseContext,
+            in processor,
+            false,
+            out float3 avgClimbingSurfaceNormal,
+            out _,
+            out _);
+        processor.SetCapsuleGeometry(character.StandingGeometry.ToCapsuleGeometry());
+
+        if (!foundSurface)
+            return false;
+
+        float3 intoWall = -math.normalizesafe(avgClimbingSurfaceNormal, float3.zero);
+        float3 moveDir = math.normalizesafe(moveVector, float3.zero);
+        return math.dot(moveDir, intoWall) >= minIntoWallDot;
     }
 
     public static bool ClimbingDetection(

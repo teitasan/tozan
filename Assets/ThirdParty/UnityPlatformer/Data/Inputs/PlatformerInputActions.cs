@@ -337,17 +337,6 @@ public partial class @PlatformerInputActions: IInputActionCollection2, IDisposab
                 },
                 {
                     ""name"": """",
-                    ""id"": ""b143f747-5e51-4c9c-9267-39ff22088fdf"",
-                    ""path"": ""<Keyboard>/leftShift"",
-                    ""interactions"": """",
-                    ""processors"": """",
-                    ""groups"": """",
-                    ""action"": ""Sprint"",
-                    ""isComposite"": false,
-                    ""isPartOfComposite"": false
-                },
-                {
-                    ""name"": """",
                     ""id"": ""e023a517-781e-496f-96e1-62a85c46f78e"",
                     ""path"": ""<Gamepad>/rightTrigger"",
                     ""interactions"": """",
@@ -382,7 +371,7 @@ public partial class @PlatformerInputActions: IInputActionCollection2, IDisposab
                 {
                     ""name"": """",
                     ""id"": ""922282e4-fb57-400d-aaa9-cb143fa897ce"",
-                    ""path"": ""<Keyboard>/e"",
+                    ""path"": ""<Keyboard>/leftShift"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -442,28 +431,6 @@ public partial class @PlatformerInputActions: IInputActionCollection2, IDisposab
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""Rope"",
-                    ""isComposite"": false,
-                    ""isPartOfComposite"": false
-                },
-                {
-                    ""name"": """",
-                    ""id"": ""8c686a2f-07d8-40d3-ab87-dfb197892165"",
-                    ""path"": ""<Keyboard>/f"",
-                    ""interactions"": """",
-                    ""processors"": """",
-                    ""groups"": """",
-                    ""action"": ""Climb"",
-                    ""isComposite"": false,
-                    ""isPartOfComposite"": false
-                },
-                {
-                    ""name"": """",
-                    ""id"": ""af69a741-4607-4b4c-9e46-6f53158ba1e5"",
-                    ""path"": ""<Gamepad>/leftShoulder"",
-                    ""interactions"": """",
-                    ""processors"": """",
-                    ""groups"": """",
-                    ""action"": ""Climb"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },

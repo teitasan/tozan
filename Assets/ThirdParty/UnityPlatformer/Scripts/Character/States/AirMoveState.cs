@@ -166,13 +166,10 @@ public struct AirMoveState : IPlatformerCharacterState
             return true;
         }
 
-        if (characterControl.ClimbPressed)
+        if (ClimbingState.ShouldAutoStartClimbing(ref context, ref baseContext, in processor, characterControl.MoveVector))
         {
-            if (ClimbingState.CanStartClimbing(ref context, ref baseContext, in processor))
-            {
-                stateMachine.TransitionToState(CharacterState.Climbing, ref context, ref baseContext, in processor);
-                return true;
-            }
+            stateMachine.TransitionToState(CharacterState.Climbing, ref context, ref baseContext, in processor);
+            return true;
         }
 
         return processor.DetectGlobalTransitions(ref context, ref baseContext);

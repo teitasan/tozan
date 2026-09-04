@@ -84,10 +84,6 @@ public partial class PlatformerPlayerInputsSystem : SystemBase
             {
                 playerInputs.ValueRW.RopePressed.Set(fixedTick);
             }
-            if (_defaultActionsMap.Climb.WasPressedThisFrame())
-            {
-                playerInputs.ValueRW.ClimbPressed.Set(fixedTick);
-            }
             if (_defaultActionsMap.FlyNoCollisions.WasPressedThisFrame())
             {
                 playerInputs.ValueRW.FlyNoCollisionsPressed.Set(fixedTick);
@@ -182,7 +178,6 @@ public partial struct PlatformerPlayerFixedStepControlSystem : ISystem
                 characterControl.DashPressed = playerInputs.ValueRW.DashPressed.IsSet(fixedTick);
                 characterControl.CrouchPressed = playerInputs.ValueRW.CrouchPressed.IsSet(fixedTick);
                 characterControl.RopePressed = playerInputs.ValueRW.RopePressed.IsSet(fixedTick);
-                characterControl.ClimbPressed = playerInputs.ValueRW.ClimbPressed.IsSet(fixedTick);
                 characterControl.FlyNoCollisionsPressed = playerInputs.ValueRW.FlyNoCollisionsPressed.IsSet(fixedTick);
 
                 SystemAPI.SetComponent(player.ControlledCharacter, characterControl);

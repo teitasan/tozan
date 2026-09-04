@@ -177,13 +177,13 @@ namespace Tozan.Tests
                 new float3(0f, 1.1f, 1.15f), quaternion.identity, float3.zero);
             EnsureTestDrive(em, character);
 
-            yield return DriveUntilState(em, character, "Climbing", 4f, new float3(0f, 0f, 0.4f), false, climbPressed: true);
-            yield return HoldState(em, character, "Climbing", 15, new float3(0f, 0.4f, 0f), climbPressed: false);
+            yield return DriveUntilState(em, character, "Climbing", 4f, new float3(0f, 0f, 0.4f), false);
+            yield return HoldState(em, character, "Climbing", 15, new float3(0f, 0.4f, 0f));
 
             var pos = em.GetComponentData<LocalTransform>(character).Position;
             Assert.Greater(pos.y, 1.05f, "geometry climb should raise character on vertical wall fixture");
 
-            SetDrive(em, character, float3.zero, false, false, climbPressed: true);
+            SetDrive(em, character, float3.zero, false, true);
             yield return PlatformerTestHelpers.WaitForState("AirMove", 3f);
         }
 
@@ -202,14 +202,14 @@ namespace Tozan.Tests
                 new float3(0f, 1.1f, 20.85f), quaternion.identity, float3.zero);
             EnsureTestDrive(em, character);
 
-            yield return DriveUntilState(em, character, "Climbing", 4f, float3.zero, false, climbPressed: true);
+            yield return DriveUntilState(em, character, "Climbing", 4f, new float3(0f, 0f, 0.4f), false);
             yield return HoldState(em, character, "Climbing", 15, new float3(0f, 0.4f, 0f));
 
             var pos = em.GetComponentData<LocalTransform>(character).Position;
             Assert.IsTrue(math.all(math.isfinite(pos)), "irregular MeshCollider climb must not produce NaN");
             Assert.Greater(pos.y, 1.05f, "geometry climb should work on the unmarked irregular MeshCollider fixture");
 
-            SetDrive(em, character, float3.zero, false, false, climbPressed: true);
+            SetDrive(em, character, float3.zero, false, true);
             yield return PlatformerTestHelpers.WaitForState("AirMove", 3f);
         }
 
