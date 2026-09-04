@@ -65,6 +65,9 @@ namespace Tozan.Editor
             var loco = player.AddComponent<TraverserLocomotionAbility>();
             loco.locomotionData = AssetDatabase.LoadAssetAtPath<TraverserLocomotionData>(LocomotionDataPath);
             loco.fIKOn = false;
+            loco.iterations = 1;
+            loco.stepping = 1.0f;
+            loco.initialJumpSpeed = 6.0f;
             if (Camera.main != null)
                 loco.cameraTransform = Camera.main.transform;
 

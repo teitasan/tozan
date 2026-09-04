@@ -79,6 +79,8 @@ namespace Traverser
         // --- Whether or not the character controller's capsule collider is grounded ---
         public bool isGrounded { get => current.isGrounded; }
 
+        public bool isCapsuleGrounded => characterController != null && characterController.isGrounded;
+
         // --- Whether or not the character controller reacts to collisions ---
         public bool collisionEnabled { get => characterController.detectCollisions; set => characterController.detectCollisions = value; }
 
@@ -216,10 +218,7 @@ namespace Traverser
 
             // --- Apply gravity ---
             if (currentGravity)
-            {
-                Vector3 gravity = Physics.gravity;
-                state.currentCollision.dynamicsDisplacement = gravity * deltaTime * stepping;
-            }
+                state.currentCollision.dynamicsDisplacement = Physics.gravity * deltaTime * stepping;
 
             // --- Compute final displacement/position and move character controller ---
             Vector3 desiredDisplacement = state.currentCollision.kinematicDisplacement + state.currentCollision.dynamicsDisplacement;

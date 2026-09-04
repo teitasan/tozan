@@ -186,6 +186,7 @@ namespace Tozan.Editor
             ground.transform.position = Vector3.zero;
             ground.transform.localScale = new Vector3(8f, 1f, 8f);
             ground.isStatic = true;
+            UseSolidGroundCollider(ground);
 
             var rocks = new GameObject("NaturalRocks");
             rocks.tag = "Untagged";
@@ -474,6 +475,20 @@ namespace Tozan.Editor
 
             TozanCharacterSetup.AttachVisualToStarterPlayer(player);
             return player;
+        }
+
+        public static void UseSolidGroundCollider(GameObject ground)
+        {
+            if (ground == null)
+                return;
+            var mesh = ground.GetComponent<MeshCollider>();
+            if (mesh != null)
+                Object.DestroyImmediate(mesh);
+            var box = ground.GetComponent<BoxCollider>();
+            if (box == null)
+                box = ground.AddComponent<BoxCollider>();
+            box.size = new Vector3(10f, 1f, 10f);
+            box.center = new Vector3(0f, -0.5f, 0f);
         }
 
         static void RemoveCamerasOutside(GameObject keepRoot)

@@ -76,7 +76,7 @@ namespace Traverser
 
         [Header("Jump settings")]
         [Tooltip("How fast the character begins jumping in m/s.")]
-        public float initialJumpSpeed = 12.0f;
+        public float initialJumpSpeed = 6.0f;
 
         [Tooltip("How fast the character ends up jumping in m/s.")]
         public float maxJumpSpeed = 15.0f;
@@ -538,7 +538,7 @@ namespace Traverser
                 desiredLinearSpeed += (jogSpeed - runSpeed) * deltaTime * runSpeedTime;
 
             // --- Increase timer ---
-            movementAccelerationTimer += jogSpeedTime*deltaTime;
+            movementAccelerationTimer += deltaTime / 0.25f;
 
             // --- Cap timer ---
             if (movementAccelerationTimer > movementAccelerationMaxTime)
@@ -618,11 +618,12 @@ namespace Traverser
             if (!abilityController.inputController.GetInputButtonNorth())
                 northJumpLocked = false;
 
-            // Dummy Idle clips make every state name match; require grounded + a fresh press.
+            var onGround = controller.isGrounded || controller.isCapsuleGrounded || controller.previous.isGrounded;
+
             if (!wasJumping && !northJumpLocked
                 && abilityController.inputController.GetInputButtonNorth()
                 && state == LocomotionAbilityState.Moving
-                && controller.isGrounded)
+                && onGround)
             {
                 state = LocomotionAbilityState.Jumping;
                 wasJumping = true;
@@ -642,20 +643,15 @@ namespace Traverser
             {
                 currentTime += Time.deltaTime;
 
-                if (currentTime < jumpTime && !isApex)
+                if (currentTime >= jumpTime)
                 {
-                    // hold launch speed briefly
-                }
-                else if (currentJumpSpeed > 0.0f)
-                {
-                    currentJumpSpeed -= Mathf.Max(jumpDeceleration, 40.0f) * Time.deltaTime;
+                    currentJumpSpeed = Mathf.MoveTowards(currentJumpSpeed, 0.0f, 40.0f * Time.deltaTime);
                     isApex = true;
-                    if (currentJumpSpeed < 0.0f)
-                        currentJumpSpeed = 0.0f;
-                    state = LocomotionAbilityState.Falling;
+                    if (currentJumpSpeed <= 0.0f)
+                        state = LocomotionAbilityState.Falling;
                 }
 
-                if (currentTime > jumpTime && controller.isGrounded)
+                if ((currentTime > jumpTime && onGround) || currentTime > 1.25f)
                 {
                     if (speed < walkSpeed)
                         animationController.animator.CrossFade(locomotionData.fallToLandAnimation.animationStateName, locomotionData.fallToLandAnimation.transitionDuration);
@@ -672,12 +668,18 @@ namespace Traverser
 
         public float DampenSpeed(float speed)
         {
-            // --- Dampen speed when certain animations are playing ---
-            if (animationController.animator.GetCurrentAnimatorStateInfo(0).IsName(locomotionData.fallToLandAnimation.animationStateName))
+            var jumpName = locomotionData.jumpAnimation.animationStateName;
+            var landName = locomotionData.fallToLandAnimation.animationStateName;
+            var runLandName = locomotionData.fallToRunAnimation.animationStateName;
+            if (jumpName == landName && landName == locomotionData.locomotionONAnimation.animationStateName)
+                return speed;
+
+            var stateInfo = animationController.animator.GetCurrentAnimatorStateInfo(0);
+            if (stateInfo.IsName(landName))
                 speed = speed * 0.25f;
-            else if (animationController.animator.GetCurrentAnimatorStateInfo(0).IsName(locomotionData.jumpAnimation.animationStateName))
+            else if (stateInfo.IsName(jumpName))
                 speed = speed * 0.75f;
-            else if (animationController.animator.GetCurrentAnimatorStateInfo(0).IsName(locomotionData.fallToRunAnimation.animationStateName))
+            else if (stateInfo.IsName(runLandName))
                 speed = speed * 0.75f;
 
             return speed;

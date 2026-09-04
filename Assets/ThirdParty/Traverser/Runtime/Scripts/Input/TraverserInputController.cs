@@ -56,6 +56,23 @@ namespace Traverser
             inputLook = Vector2.zero;
         }
 
+        void Update()
+        {
+            var playerInput = GetComponent<PlayerInput>();
+            if (playerInput == null || !playerInput.enabled)
+                return;
+
+            var north = Keyboard.current != null && Keyboard.current.spaceKey.isPressed;
+            if (Gamepad.current != null)
+                north |= Gamepad.current.buttonSouth.isPressed;
+            SetButton(InputInteraction.NorthButton, north);
+
+            var run = Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed;
+            if (Gamepad.current != null)
+                run |= Gamepad.current.leftTrigger.ReadValue() > 0.5f;
+            SetButton(InputInteraction.RunButton, run);
+        }
+
         public bool GetInputButtonWest()
         {
             return (inputInteraction & InputInteraction.WestButton) != 0;
