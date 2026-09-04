@@ -25,8 +25,8 @@ Console Error を確認すること。
 
 本命の採用判断は Marker / HandlePoint / Bake なしの自然形状 Traversal。
 候補条件: 任意 Mesh を runtime で形状解析し、ledge を検出できること。「climbing」「parkour」と書いてあるだけでは入れない。Bake/Marker 方式は候補から外す。
-STEP 14 は Traverser を `NaturalRockSandbox` にぶつけた結果、Marker なしでは Grab できない。既製 Traversal 探しは止め、次は自前 Geometry Detector + Animation Rigging + 既製 Animation/Motion Warping。
-Nature Renderer / MicroSplat / Gaia / Final IK / 有料 Parkour / ECS Character Controller は入れない。
+STEP 14 は Traverser を `NaturalRockSandbox` にぶつけた結果、Marker なしでは Grab できない。既製 Traversal 探しは止める。STEP 15 の Player は公式 ECS Platformer Sample（`com.unity.charactercontroller`）。DPS / Traverser の Player は完成させない。岩に Climbable Tag / HandlePoints / TraverserClimbingObject を足してテストを緑にしない。
+Nature Renderer / MicroSplat / Gaia / Final IK / 有料 Parkour は入れない。
 
 明示指示なしに STEP 3 以降へ進まない。
 

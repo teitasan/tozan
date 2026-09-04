@@ -8,6 +8,7 @@ using UnityEngine.TestTools;
 
 namespace Tozan.Tests
 {
+    [Ignore("STEP 15: NaturalRockSandbox uses ECS Platformer, not TraverserPlayer")]
     public class TraverserNaturalRockTests
     {
         [UnityTest]

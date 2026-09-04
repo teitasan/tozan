@@ -1,7 +1,9 @@
 using System.Collections;
-using System.Reflection;
-using System.Text;
 using NUnit.Framework;
+using Unity.Collections;
+using Unity.Entities;
+using Unity.Mathematics;
+using Unity.Transforms;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -10,340 +12,220 @@ namespace Tozan.Tests
 {
     public class NaturalRockSandboxTests
     {
-        static readonly string[] RequiredRocks =
-        {
-            "Rock_VerticalWall",
-            "Rock_Slope80",
-            "Rock_OverhangShelf",
-            "Rock_Overhang",
-            "Rock_VariableWidthLedge",
-            "Rock_ConvexCorner",
-            "Rock_ConcaveCorner",
-            "Rock_SteppedLedges",
-            "Rock_Irregular"
-        };
-
         [UnityTest]
-        public IEnumerator NaturalRockSandbox_HasUnmarkedNaturalGeometry()
+        [Timeout(90000)]
+        public IEnumerator NaturalRockSandbox_SpawnsPlatformerWithoutClimbMarkers()
         {
             yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
-            yield return null;
+            yield return WaitForState("GroundMove", 10f);
 
-            var rocks = GameObject.Find("NaturalRocks");
-            Assert.IsNotNull(rocks, "NaturalRocks root");
-            foreach (var name in RequiredRocks)
-                Assert.IsNotNull(GameObject.Find(name), name);
-
+            Assert.IsNull(GameObject.Find("TraverserPlayer"), "STEP 15 player is ECS Platformer, not Traverser");
+            Assert.IsNull(GameObject.Find("PlayerModel"), "DPS player must not be in the natural-rock gate");
             Assert.IsNull(GameObject.Find("Climb_Ledge"));
-            Assert.IsNull(GameObject.Find("Climb_Wall"));
-            Assert.IsNull(GameObject.Find("Climb_SmallLedge"));
             Assert.IsNull(GameObject.Find("Vault_Box"));
-            Assert.IsNull(GameObject.Find("Jump_Reach"));
 
-            foreach (var t in rocks.GetComponentsInChildren<Transform>(true))
+            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include))
             {
-                Assert.AreNotEqual("Vault", t.gameObject.tag, t.name + " must not use Vault tag");
-                Assert.AreEqual(0, t.gameObject.layer, t.name + " must stay on Default (no Ledge/Wall layer)");
-                foreach (var c in t.GetComponents<Component>())
+                Assert.AreNotEqual("Vault", go.tag, go.name);
+                foreach (var c in go.GetComponents<Component>())
                 {
                     if (c == null)
                         continue;
-                    var typeName = c.GetType().Name;
-                    Assert.AreNotEqual("HandlePoints", typeName, t.name);
-                    Assert.AreNotEqual("Point", typeName, t.name);
-                    Assert.AreNotEqual("TraverserClimbingObject", typeName, t.name);
-                    Assert.AreNotEqual("TraverserParkourObject", typeName, t.name);
+                    var n = c.GetType().Name;
+                    Assert.AreNotEqual("HandlePoints", n, go.name);
+                    Assert.AreNotEqual("TraverserClimbingObject", n, go.name);
+                    Assert.AreNotEqual("TraverserParkourObject", n, go.name);
                 }
             }
 
-            var player = GameObject.Find("TraverserPlayer");
-            Assert.IsNotNull(player, "STEP 14 Traverser player");
-            Assert.IsTrue(HasComponent(player, "TraverserClimbingAbility"));
+            var world = World.DefaultGameObjectInjectionWorld;
+            Assert.IsNotNull(world);
+            Assert.AreNotEqual(Entity.Null, FindCharacter(world.EntityManager));
         }
 
         [UnityTest]
-        [Timeout(25000)]
-        [Ignore("STEP 13 already recorded DPS failure on this scene. STEP 14 hosts TraverserPlayer instead.")]
-        public IEnumerator NaturalRockSandbox_UnmarkedMesh_GrabHangTraverseMantle()
+        [Timeout(90000)]
+        public IEnumerator NaturalRockSandbox_UnmarkedMesh_OfficialLedgeGrab()
         {
-            // Adoption gate. Do not make this pass by adding Vault tags, Ledge layer,
-            // HandlePoints, or DPS environment prefabs. A fail means DPS does not
-            // read unmarked natural meshes.
+            // Adoption gate. Do not pass this by adding Climbable tags, HandlePoints,
+            // TraverserClimbingObject, Vault tags, or Ledge layer.
             yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
-            yield return null;
-            yield return new WaitForFixedUpdate();
+            yield return WaitForState("GroundMove", 10f);
 
-            var player = FindClimbPlayer();
-            Assert.IsNotNull(player, "DPS player");
+            var world = World.DefaultGameObjectInjectionWorld;
+            var em = world.EntityManager;
+            var character = FindCharacter(em);
+            Assert.AreNotEqual(Entity.Null, character, "Platformer character entity");
 
-            var start = GameObject.Find("TraversalStart");
-            var spawn = start != null ? start.transform.position : new Vector3(0f, 0.1f, 0.2f);
-            player.transform.SetPositionAndRotation(spawn, Quaternion.identity);
-            var rb = player.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-            }
+            ZeroBodyVelocity(em, character);
+            var lt = em.GetComponentData<LocalTransform>(character);
+            // Shelf_Low: unmarked box, top ~y=1.075, front ~z=16.075.
+            // Official CanGrabLedge runs only in AirMove and rejects grabs while moving up
+            // the surface normal. Approach falling into the lip, not jumping onto the top.
+            lt.Position = new float3(0f, 0.55f, 15.7f);
+            lt.Rotation = quaternion.identity;
+            em.SetComponentData(character, lt);
+            SetBodyVelocity(em, character, new float3(0f, -2f, 4f));
 
-            DisablePlayerInput(player);
-            yield return new WaitForSeconds(0.4f);
+            EnsureTestDrive(em, character);
 
             var grabbed = false;
-            var hung = false;
-            var traversed = false;
-            var mantled = false;
-            var hangX = player.transform.position.x;
-            var hangY = player.transform.position.y;
-
-            yield return HoldInput(player, Vector2.zero, true, 0.45f);
-
-            var grabDeadline = Time.time + 2.2f;
-            while (Time.time < grabDeadline)
+            var states = "";
+            var deadline = Time.time + 5f;
+            var frames = 0;
+            while (Time.time < deadline)
             {
-                SetDpsInput(player, Vector2.zero, true);
-                if (IsGrabbed(player))
-                    grabbed = true;
-                if (IsHanging(player))
+                SetDrive(em, character, new float3(0f, 0f, 1f), false, false);
+                var state = ReadCurrentState(em, character);
+                if (frames % 8 == 0)
+                    states += state + ",";
+                if (state == "LedgeGrab" || state == "LedgeStandingUp")
                 {
-                    hung = true;
-                    hangX = player.transform.position.x;
-                    hangY = player.transform.position.y;
+                    grabbed = true;
                     break;
                 }
+                frames++;
                 yield return null;
             }
 
-            if (hung)
-            {
-                var traverseDeadline = Time.time + 1.6f;
-                while (Time.time < traverseDeadline)
-                {
-                    SetDpsInput(player, new Vector2(1f, 0f), false);
-                    if (IsHanging(player) && Mathf.Abs(player.transform.position.x - hangX) > 0.15f)
-                    {
-                        traversed = true;
-                        break;
-                    }
-                    yield return null;
-                }
-
-                var preMantleY = player.transform.position.y;
-                var mantleDeadline = Time.time + 3.2f;
-                while (Time.time < mantleDeadline)
-                {
-                    SetDpsInput(player, new Vector2(0f, 1f), true);
-                    if (IsMantling(player) || (player.transform.position.y > preMantleY + 0.8f && !IsHanging(player)))
-                    {
-                        mantled = true;
-                        break;
-                    }
-                    yield return null;
-                }
-            }
-
-            var report = BuildReport(player, grabbed, hung, traversed, mantled);
-            Debug.Log(report);
-            Assert.IsTrue(grabbed && hung && traversed && mantled,
-                "DPS did not complete Grab→Hang→Traverse→Mantle on unmarked natural mesh. " + report);
+            var pos = em.GetComponentData<LocalTransform>(character).Position;
+            var report = "stateTrail=" + states + " last=" + ReadCurrentState(em, character) + " pos=" + pos;
+            Debug.Log("STEP15 LedgeGrab " + report);
+            Assert.IsTrue(grabbed,
+                "Official LedgeDetection did not enter LedgeGrab on unmarked natural mesh. " + report);
         }
 
-        static IEnumerator HoldInput(GameObject player, Vector2 move, bool jump, float seconds)
+        static IEnumerator WaitForState(string expected, float seconds)
         {
             var end = Time.time + seconds;
             while (Time.time < end)
             {
-                SetDpsInput(player, move, jump);
+                var world = World.DefaultGameObjectInjectionWorld;
+                if (world != null && world.IsCreated)
+                {
+                    var character = FindCharacter(world.EntityManager);
+                    if (character != Entity.Null && ReadCurrentState(world.EntityManager, character) == expected)
+                        yield break;
+                }
                 yield return null;
             }
-        }
 
-        static GameObject FindClimbPlayer()
-        {
-            var model = GameObject.Find("PlayerModel");
-            if (model != null && HasComponent(model, "ClimbController"))
-                return model;
-            var player = GameObject.Find("Player");
-            if (player != null && HasComponent(player, "ClimbController"))
-                return player;
-            return model != null ? model : player;
-        }
-
-        static bool HasComponent(GameObject go, string typeName)
-        {
-            foreach (var c in go.GetComponents<Component>())
+            var last = "none";
+            var w = World.DefaultGameObjectInjectionWorld;
+            if (w != null && w.IsCreated)
             {
-                if (c != null && c.GetType().Name == typeName)
-                    return true;
+                var c = FindCharacter(w.EntityManager);
+                last = c == Entity.Null ? "no-character" : ReadCurrentState(w.EntityManager, c);
             }
-            return false;
+            Assert.Fail("Timed out waiting for " + expected + " (last=" + last + ")");
         }
 
-        static void DisablePlayerInput(GameObject player)
+        static Entity FindCharacter(EntityManager em)
         {
-            var input = FindComponent(player, "InputCharacterController") as Behaviour;
-            if (input != null)
-                input.enabled = false;
-            var playerInput = FindComponent(player, "PlayerInput") as Behaviour;
-            if (playerInput != null)
-                playerInput.enabled = false;
+            var type = FindType("PlatformerCharacterStateMachine");
+            if (type == null)
+                return Entity.Null;
+            using var query = em.CreateEntityQuery(ComponentType.ReadOnly(type));
+            using var entities = query.ToEntityArray(Allocator.Temp);
+            return entities.Length > 0 ? entities[0] : Entity.Null;
         }
 
-        static void SetDpsInput(GameObject player, Vector2 movement, bool jump)
+        static void EnsureTestDrive(EntityManager em, Entity character)
         {
-            var input = FindComponent(player, "InputCharacterController");
-            if (input == null)
-                return;
-            SetField(input, "movement", movement);
-            SetField(input, "jump", jump);
-            SetField(input, "drop", false);
+            var type = FindType("TozanPlatformerTestDrive");
+            Assert.IsNotNull(type, "TozanPlatformerTestDrive");
+            if (!em.HasComponent(character, type))
+                em.AddComponent(character, type);
         }
 
-        static bool IsGrabbed(GameObject player)
+        static void SetBodyVelocity(EntityManager em, Entity character, float3 linear)
         {
-            if (ReadBool(player, "ThirdPersonController", "dummy"))
-                return true;
-            if (ReadBool(player, "ClimbController", "toLedge"))
-                return true;
-            if (ReadBool(player, "ClimbController", "onLedge"))
-                return true;
-            return AnimatorMatches(player, "Idle To Braced Hang", "Idle To Freehang");
-        }
-
-        static bool IsHanging(GameObject player)
-        {
-            if (ReadBool(player, "ClimbController", "onLedge"))
-                return true;
-            var state = ReadField(player, "ClimbController", "curClimbState");
-            if (state != null)
+            var bodyType = FindType("Unity.CharacterController.KinematicCharacterBody");
+            if (bodyType != null && em.HasComponent(character, bodyType))
             {
-                var name = state.ToString();
-                if (name == "BHanging" || name == "FHanging")
-                    return true;
-            }
-            return AnimatorMatches(player, "Hanging Movement");
-        }
-
-        static bool IsMantling(GameObject player)
-        {
-            return AnimatorMatches(player, "Braced Hang To Crouch", "Freehang Climb");
-        }
-
-        static bool AnimatorMatches(GameObject player, params string[] states)
-        {
-            var animator = player.GetComponent<Animator>();
-            if (animator == null)
-                return false;
-            var info = animator.GetCurrentAnimatorStateInfo(0);
-            foreach (var state in states)
-            {
-                if (info.IsName(state))
-                    return true;
-            }
-            return false;
-        }
-
-        static string BuildReport(GameObject player, bool grabbed, bool hung, bool traversed, bool mantled)
-        {
-            var sb = new StringBuilder();
-            sb.Append("STEP13 grab=").Append(grabbed);
-            sb.Append(" hang=").Append(hung);
-            sb.Append(" traverse=").Append(traversed);
-            sb.Append(" mantle=").Append(mantled);
-            sb.Append(" pos=").Append(player.transform.position);
-            sb.Append(" dummy=").Append(ReadBool(player, "ThirdPersonController", "dummy"));
-            sb.Append(" onLedge=").Append(ReadBool(player, "ClimbController", "onLedge"));
-            sb.Append(" toLedge=").Append(ReadBool(player, "ClimbController", "toLedge"));
-            sb.Append(" climbState=").Append(ReadField(player, "ClimbController", "curClimbState"));
-
-            var det = FindComponent(player, "DetectionCharacterController");
-            if (det != null)
-            {
-                var layer = ReadField(det, "ledgeLayer");
-                sb.Append(" ledgeLayer=").Append(layer);
-                var method = det.GetType().GetMethod("FindLedgeCollision", BindingFlags.Instance | BindingFlags.Public);
-                if (method != null)
+                var boxed = GetComponent(em, character, bodyType);
+                var field = bodyType.GetField("RelativeVelocity");
+                if (field != null)
                 {
-                    var args = new object[] { new RaycastHit() };
-                    var found = (bool)method.Invoke(det, args);
-                    sb.Append(" FindLedgeCollision=").Append(found);
-                    if (found)
-                    {
-                        var hit = (RaycastHit)args[0];
-                        sb.Append(" hit=").Append(hit.collider != null ? hit.collider.name : "null");
-                    }
+                    field.SetValue(boxed, linear);
+                    SetComponent(em, character, bodyType, boxed);
                 }
             }
 
-            var rocks = GameObject.Find("NaturalRocks");
-            var handlePoints = 0;
-            if (rocks != null)
+            var velType = FindType("Unity.Physics.PhysicsVelocity");
+            if (velType != null && em.HasComponent(character, velType))
             {
-                foreach (var c in rocks.GetComponentsInChildren<Component>(true))
-                {
-                    if (c != null && c.GetType().Name == "HandlePoints")
-                        handlePoints++;
-                }
+                var boxed = GetComponent(em, character, velType);
+                var linearField = velType.GetField("Linear");
+                var angular = velType.GetField("Angular");
+                if (linearField != null)
+                    linearField.SetValue(boxed, linear);
+                if (angular != null)
+                    angular.SetValue(boxed, float3.zero);
+                SetComponent(em, character, velType, boxed);
             }
-            sb.Append(" rockHandlePoints=").Append(handlePoints);
-            return sb.ToString();
         }
 
-        static bool ReadBool(GameObject go, string typeName, string field)
+        static void ZeroBodyVelocity(EntityManager em, Entity character)
         {
-            var c = FindComponent(go, typeName);
-            if (c == null)
-                return false;
-            var value = ReadField(c, field);
-            return value is bool b && b;
+            SetBodyVelocity(em, character, float3.zero);
         }
 
-        static object ReadField(GameObject go, string typeName, string field)
+        static void SetDrive(EntityManager em, Entity character, float3 move, bool jumpHeld, bool jumpPressed)
         {
-            var c = FindComponent(go, typeName);
-            return c == null ? null : ReadField(c, field);
+            var type = FindType("TozanPlatformerTestDrive");
+            var boxed = System.Activator.CreateInstance(type);
+            type.GetField("MoveVector").SetValue(boxed, move);
+            type.GetField("JumpHeld").SetValue(boxed, jumpHeld);
+            type.GetField("JumpPressed").SetValue(boxed, jumpPressed);
+            SetComponent(em, character, type, boxed);
         }
 
-        static Component FindComponent(GameObject go, string typeName)
+        static string ReadCurrentState(EntityManager em, Entity character)
         {
-            if (go == null)
-                return null;
-            foreach (var c in go.GetComponents<Component>())
+            var type = FindType("PlatformerCharacterStateMachine");
+            var data = GetComponent(em, character, type);
+            var state = type.GetField("CurrentState").GetValue(data);
+            return state != null ? state.ToString() : "null";
+        }
+
+        static object GetComponent(EntityManager em, Entity entity, System.Type type)
+        {
+            foreach (var m in typeof(EntityManager).GetMethods())
             {
-                if (c != null && c.GetType().Name == typeName)
-                    return c;
+                if (m.Name != "GetComponentData" || !m.IsGenericMethod)
+                    continue;
+                var ps = m.GetParameters();
+                if (ps.Length == 1 && ps[0].ParameterType == typeof(Entity))
+                    return m.MakeGenericMethod(type).Invoke(em, new object[] { entity });
             }
             return null;
         }
 
-        static object ReadField(object target, string name)
+        static void SetComponent(EntityManager em, Entity entity, System.Type type, object boxed)
         {
-            if (target == null)
-                return null;
-            var type = target.GetType();
-            while (type != null)
+            foreach (var m in typeof(EntityManager).GetMethods())
             {
-                var field = type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (field != null)
-                    return field.GetValue(target);
-                type = type.BaseType;
-            }
-            return null;
-        }
-
-        static void SetField(object target, string name, object value)
-        {
-            var type = target.GetType();
-            while (type != null)
-            {
-                var field = type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (field != null)
+                if (m.Name != "SetComponentData" || !m.IsGenericMethod)
+                    continue;
+                var ps = m.GetParameters();
+                if (ps.Length == 2 && ps[0].ParameterType == typeof(Entity))
                 {
-                    field.SetValue(target, value);
+                    m.MakeGenericMethod(type).Invoke(em, new[] { entity, boxed });
                     return;
                 }
-                type = type.BaseType;
             }
+        }
+
+        static System.Type FindType(string name)
+        {
+            foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var t = asm.GetType(name);
+                if (t != null)
+                    return t;
+            }
+            return null;
         }
     }
 }

@@ -176,17 +176,16 @@ namespace Tozan.Editor
 
         public static string BuildNaturalRockSandbox()
         {
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-            scene.name = "NaturalRockSandbox";
+            var content = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            content.name = "NaturalRockSandboxContent";
 
-            var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            var ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
             ground.name = "Ground";
             ground.tag = "Untagged";
             ground.layer = 0;
-            ground.transform.position = Vector3.zero;
-            ground.transform.localScale = new Vector3(8f, 1f, 8f);
+            ground.transform.position = new Vector3(0f, -0.5f, 0f);
+            ground.transform.localScale = new Vector3(80f, 1f, 80f);
             ground.isStatic = true;
-            UseSolidGroundCollider(ground);
 
             var rocks = new GameObject("NaturalRocks");
             rocks.tag = "Untagged";
@@ -196,13 +195,12 @@ namespace Tozan.Editor
             var start = new GameObject("TraversalStart");
             start.transform.SetPositionAndRotation(new Vector3(0f, 0.1f, 0.2f), Quaternion.identity);
 
-            var playerRoot = TozanTraverserSetup.CreatePlayer(start.transform.position);
-            playerRoot.transform.rotation = Quaternion.identity;
-            RemoveCamerasOutside(playerRoot);
-            SetupMainCamera(false);
-            var loco = playerRoot.GetComponent<Traverser.TraverserLocomotionAbility>();
-            if (loco != null && Camera.main != null)
-                loco.cameraTransform = Camera.main.transform;
+            TozanPlatformerSetup.ConvertActiveSceneToUnityPhysics();
+            EditorSceneManager.SaveScene(content, TozanPlatformerSetup.ContentScenePath);
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+            scene.name = "NaturalRockSandbox";
+            TozanPlatformerSetup.AttachSubSceneAndCamera();
             EnsureInBuildSettings(NaturalScenePath);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, NaturalScenePath);

@@ -1,7 +1,12 @@
 {
   "name": "Tozan.Tests",
   "rootNamespace": "Tozan.Tests",
-  "references": [],
+    "references": [
+        "Unity.Entities",
+        "Unity.Transforms",
+        "Unity.Mathematics",
+        "Unity.Collections"
+    ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
