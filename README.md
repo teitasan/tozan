@@ -5,6 +5,7 @@ Unity 6.6 / URP の登山・登攀プロトタイプ。Godot 版 `climbing_physi
 - エンジン: Unity 6000.6.0f1 / URP
 - **Player（本命）:** 公式 ECS Platformer Sample（`com.unity.charactercontroller` 1.4.2）
 - **表示モデル（NaturalRockSandbox）:** Erika（Mixamo Humanoid、`Assets/Characters/Erika/ErikaCharacterMesh.prefab`）。ECS 物理・入力・状態機械は公式 Platformer のまま。ProtoCharacter `CharacterMesh.prefab` は rollback 参照として保持。
+- 表示PrefabはECSのMeshRootに合わせたwrapper Animatorを持ち、生成時にSkinnedMeshRendererの最下点を`y=0`へ自動補正する。これにより足元とカプセルの接地基準を一致させる。
 - 参考: Dynamic Parkour System（`ClimbingSandbox`）、Starter Assets 地上クローン
 - 自然岩ゲート: `Assets/Scenes/NaturalRockSandbox.unity`
 
@@ -43,7 +44,7 @@ unity command run_tests -- --mode PlayMode --filter NaturalRockSandbox
 
 - `NaturalRockSandboxTests` — TestDrive による回帰（ledge / mantle / 大壁 fixture）
 - `NaturalRockSandboxInputTests` — **Input System キューイベント**（WASD 自動壁面移動、Space ジャンプ、Shift ダッシュ、W/S/A/D 壁面移動、ClipIndex 10 / velocity）
-- `NaturalRockSandboxErikaVisualTests` — Erika hybrid visual（Humanoid avatar、ClipIndex、Erika renderer、登攀 ClipIndex 10）
+- `NaturalRockSandboxErikaVisualTests` — Erika hybrid visual（Humanoid avatar、Hips/Head mapping、接地範囲、ClipIndex、Erika renderer、登攀 ClipIndex 10）
 
 ### Erika ビジュアルセットアップ
 

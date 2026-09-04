@@ -1377,7 +1377,7 @@ Transform:
   - {fileID: 582885468961586599}
   - {fileID: 4319374893216816391}
   - {fileID: 4695853563218014627}
-  m_Father: {fileID: 5693590964399707996}
+  m_Father: {fileID: 2534005896635747736}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &5206100140933207854
 GameObject:
@@ -1504,8 +1504,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 6054429811425734252}
-  - {fileID: 4387357644672389648}
+  - {fileID: 2534005896635747736}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!95 &5895135910127785495
@@ -1519,7 +1518,7 @@ Animator:
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: 1d2ab63b861fb5f40954f749c04af063, type: 3}
   m_Controller: {fileID: 9100000, guid: 9ffc6a019fbe44e119846dc03e7ebbe7, type: 2}
-  m_CullingMode: 1
+  m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
   m_LinearVelocityBlending: 0
@@ -1751,6 +1750,39 @@ Transform:
   - {fileID: 3265167890829228873}
   m_Father: {fileID: 4695853563218014627}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &6602960129380001251
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2534005896635747736}
+  m_Layer: 0
+  m_Name: ErikaModel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2534005896635747736
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6602960129380001251}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.0484793, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6054429811425734252}
+  - {fileID: 4387357644672389648}
+  m_Father: {fileID: 5693590964399707996}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7084766921279095513
 GameObject:
   m_ObjectHideFlags: 0
@@ -1976,7 +2008,7 @@ Transform:
   - {fileID: 446725660525973461}
   - {fileID: 559886905608456023}
   - {fileID: 8747167435819804787}
-  m_Father: {fileID: 5693590964399707996}
+  m_Father: {fileID: 2534005896635747736}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7455771561906162120
 GameObject:

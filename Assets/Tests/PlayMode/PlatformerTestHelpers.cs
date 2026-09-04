@@ -240,6 +240,37 @@ namespace Tozan.Tests
             return false;
         }
 
+        public static (float footY, float headY, float height) MeasureHybridVisualExtents(GameObject meshRoot)
+        {
+            var minY = float.PositiveInfinity;
+            var maxY = float.NegativeInfinity;
+            foreach (var renderer in meshRoot.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (renderer.sharedMesh == null)
+                    continue;
+
+                var bounds = renderer.localBounds;
+                var ext = bounds.extents;
+                for (var i = 0; i < 8; i++)
+                {
+                    var corner = bounds.center;
+                    corner.x += (i & 1) == 0 ? -ext.x : ext.x;
+                    corner.y += (i & 2) == 0 ? -ext.y : ext.y;
+                    corner.z += (i & 4) == 0 ? -ext.z : ext.z;
+                    var meshLocal = meshRoot.transform.InverseTransformPoint(renderer.transform.TransformPoint(corner));
+                    if (meshLocal.y < minY)
+                        minY = meshLocal.y;
+                    if (meshLocal.y > maxY)
+                        maxY = meshLocal.y;
+                }
+            }
+
+            if (float.IsPositiveInfinity(minY))
+                return (0f, 0f, 0f);
+
+            return (minY, maxY, maxY - minY);
+        }
+
         public static bool HasClipIndexParameter(Animator animator)
         {
             if (animator == null)

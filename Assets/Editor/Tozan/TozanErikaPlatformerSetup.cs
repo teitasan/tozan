@@ -112,19 +112,27 @@ namespace Tozan.Editor
             if (avatar == null || !avatar.isHuman)
                 throw new InvalidOperationException("Erika.fbx must import as a valid Humanoid avatar.");
 
-            // Always rebuild this generated visual from the source model. This
-            // keeps reruns deterministic and, importantly, preserves Erika's
-            // bone paths at the Animator root instead of nesting the model
-            // below a second transform with a different humanoid hierarchy.
-            var root = Object.Instantiate(erikaSource);
+            // HybridSystem attaches CharacterMesh at MeshRoot and expects the
+            // Animator on this prefab root. Lift the imported rig so feet sit
+            // on y=0; Erika's Mixamo bind pose otherwise sinks ~1m below root.
+            var root = new GameObject("CharacterMesh");
 
             try
             {
-                root.name = "CharacterMesh";
                 root.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
                 root.transform.localScale = Vector3.one;
 
-                var animator = root.GetComponent<Animator>() ?? root.AddComponent<Animator>();
+                var model = Object.Instantiate(erikaSource, root.transform);
+                model.name = "ErikaModel";
+                model.transform.localRotation = Quaternion.identity;
+                model.transform.localScale = Vector3.one;
+                model.transform.localPosition = new Vector3(0f, ComputeFootLiftY(model), 0f);
+
+                var legacyAnimator = model.GetComponent<Animator>();
+                if (legacyAnimator != null)
+                    Object.DestroyImmediate(legacyAnimator);
+
+                var animator = root.AddComponent<Animator>();
                 animator.avatar = avatar;
                 animator.runtimeAnimatorController = controller;
                 animator.applyRootMotion = false;
@@ -137,6 +145,28 @@ namespace Tozan.Editor
             }
 
             return VisualPrefabPath;
+        }
+
+        internal static float ComputeFootLiftY(GameObject modelRoot)
+        {
+            var minY = float.PositiveInfinity;
+            foreach (var renderer in modelRoot.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                var bounds = renderer.localBounds;
+                var ext = bounds.extents;
+                for (var i = 0; i < 8; i++)
+                {
+                    var corner = bounds.center;
+                    corner.x += (i & 1) == 0 ? -ext.x : ext.x;
+                    corner.y += (i & 2) == 0 ? -ext.y : ext.y;
+                    corner.z += (i & 4) == 0 ? -ext.z : ext.z;
+                    var modelLocal = modelRoot.transform.InverseTransformPoint(renderer.transform.TransformPoint(corner));
+                    if (modelLocal.y < minY)
+                        minY = modelLocal.y;
+                }
+            }
+
+            return minY < -0.001f ? -minY : 0f;
         }
 
         static void WirePlatformerMeshPrefab(string erikaMeshPrefabPath)

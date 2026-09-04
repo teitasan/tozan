@@ -53,6 +53,39 @@ namespace Tozan.Tests
 
         [UnityTest]
         [Timeout(90000)]
+        public IEnumerator NaturalRockSandbox_ErikaVisual_HasGroundedBoundsAndScale()
+        {
+            yield return LoadSandboxAndWaitForGroundMove();
+
+            var hybridAnimator = PlatformerTestHelpers.FindHybridCharacterMeshAnimator();
+            Assert.IsNotNull(hybridAnimator, "ECS hybrid link must instantiate CharacterMesh visual");
+            Assert.IsNotNull(hybridAnimator.avatar, "Erika visual must have an avatar");
+            Assert.IsTrue(hybridAnimator.avatar.isHuman, "Erika visual must use a Humanoid avatar");
+            Assert.IsTrue(hybridAnimator.avatar.isValid, "Erika Humanoid avatar must remain valid on the wrapper root");
+            Assert.IsNotNull(hybridAnimator.GetBoneTransform(HumanBodyBones.Hips),
+                "Erika Humanoid Hips mapping must survive the wrapper root");
+            Assert.IsNotNull(hybridAnimator.GetBoneTransform(HumanBodyBones.Head),
+                "Erika Humanoid Head mapping must survive the wrapper root");
+            Assert.IsTrue(PlatformerTestHelpers.HasErikaRendererIdentity(hybridAnimator),
+                "Hybrid visual must render Erika skinned meshes, not ProtoCharacter");
+
+            var scale = hybridAnimator.transform.lossyScale;
+            Assert.AreEqual(1f, scale.x, 0.05f, "Erika visual must stay unit scale on X");
+            Assert.AreEqual(1f, scale.y, 0.05f, "Erika visual must stay unit scale on Y");
+            Assert.AreEqual(1f, scale.z, 0.05f, "Erika visual must stay unit scale on Z");
+
+            var (footY, headY, height) = PlatformerTestHelpers.MeasureHybridVisualExtents(hybridAnimator.gameObject);
+            var report = "footY=" + footY + " headY=" + headY + " height=" + height;
+            Assert.That(footY, Is.GreaterThan(-0.15f).And.LessThan(0.15f),
+                "Erika feet must align with MeshRoot ground, not sink below capsule. " + report);
+            Assert.That(height, Is.InRange(1.3f, 2.1f),
+                "Erika humanoid height should match Platformer capsule proportions. " + report);
+            Assert.That(headY, Is.GreaterThan(1.2f).And.LessThan(2.2f),
+                "Erika head should sit above the standing capsule for camera framing. " + report);
+        }
+
+        [UnityTest]
+        [Timeout(90000)]
         public IEnumerator NaturalRockSandbox_ErikaHybridVisual_EntersClimbingWithClipIndex10()
         {
             yield return LoadSandboxAndWaitForGroundMove();
