@@ -120,15 +120,16 @@ public static class PlatformerCharacterAnimationHandler
                 break;
             case CharacterState.LedgeGrab:
             {
-                float velocityRatio = velocityMagnitude / characterComponent.LedgeMoveSpeed;
-                animator.speed = velocityRatio;
+                // Still hang must not freeze the clip at speed 0.
+                float velocityRatio = velocityMagnitude / math.max(characterComponent.LedgeMoveSpeed, 0.01f);
+                animator.speed = math.max(velocityRatio, 1f);
                 animator.SetInteger(characterAnimation.ClipIndexParameterHash, characterAnimation.LedgeGrabMoveClip);
             }
                 break;
             case CharacterState.LedgeStandingUp:
             {
                 animator.speed = 1f;
-                //animator.SetInteger(characterAnimation.ClipIndexParameterHash, characterAnimation.LedgeStandUpClip);
+                animator.SetInteger(characterAnimation.ClipIndexParameterHash, characterAnimation.LedgeStandUpClip);
             }
                 break;
             case CharacterState.Swimming:

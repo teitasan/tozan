@@ -57,42 +57,137 @@ namespace Tozan.Tests
             var character = FindCharacter(em);
             Assert.AreNotEqual(Entity.Null, character, "Platformer character entity");
 
-            ZeroBodyVelocity(em, character);
-            var lt = em.GetComponentData<LocalTransform>(character);
-            // Shelf_Low: unmarked box, top ~y=1.075, front ~z=16.075.
-            // Official CanGrabLedge runs only in AirMove and rejects grabs while moving up
-            // the surface normal. Approach falling into the lip, not jumping onto the top.
-            lt.Position = new float3(0f, 0.55f, 15.7f);
-            lt.Rotation = quaternion.identity;
-            em.SetComponentData(character, lt);
-            SetBodyVelocity(em, character, new float3(0f, -2f, 4f));
-
+            PlaceFallingAtUnmarkedShelf(em, character);
             EnsureTestDrive(em, character);
 
-            var grabbed = false;
+            yield return DriveUntilState(em, character, "LedgeGrab", 5f, new float3(0f, 0f, 0.4f), false);
+            yield return HoldState(em, character, "LedgeGrab", 10, float3.zero);
+
+            var pos = em.GetComponentData<LocalTransform>(character).Position;
+            var report = "last=" + ReadCurrentState(em, character) + " pos=" + pos;
+            Debug.Log("STEP15 LedgeGrab " + report);
+            Assert.AreEqual("LedgeGrab", ReadCurrentState(em, character),
+                "Official LedgeDetection did not hang on unmarked overhang lip. " + report);
+        }
+
+        [UnityTest]
+        [Timeout(90000)]
+        public IEnumerator NaturalRockSandbox_UnmarkedMesh_OfficialLedgeStandUp()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
+            yield return WaitForState("GroundMove", 10f);
+
+            var world = World.DefaultGameObjectInjectionWorld;
+            var em = world.EntityManager;
+            var character = FindCharacter(em);
+            Assert.AreNotEqual(Entity.Null, character, "Platformer character entity");
+
+            PlaceFallingAtUnmarkedShelf(em, character);
+            EnsureTestDrive(em, character);
+            yield return DriveUntilState(em, character, "LedgeGrab", 5f, new float3(0f, 0f, 0.4f), false);
+            yield return HoldState(em, character, "LedgeGrab", 10, float3.zero);
+
+            var hangClip = ReadHybridClipIndex();
+            Assert.AreEqual(4, hangClip, "official LedgeGrabMove clip (ClipIndex 4) during hang, was " + hangClip);
+
+            for (var i = 0; i < 12; i++)
+            {
+                var hanging = ReadCurrentState(em, character) == "LedgeGrab";
+                SetDrive(em, character, float3.zero, false, hanging);
+                yield return null;
+                if (!hanging)
+                    break;
+            }
+            SetDrive(em, character, float3.zero, false, false);
+
+            var sawStandUp = false;
             var states = "";
-            var deadline = Time.time + 5f;
+            var deadline = Time.time + 4f;
             var frames = 0;
             while (Time.time < deadline)
             {
-                SetDrive(em, character, new float3(0f, 0f, 1f), false, false);
+                SetDrive(em, character, float3.zero, false, false);
                 var state = ReadCurrentState(em, character);
-                if (frames % 8 == 0)
+                if (frames % 6 == 0)
                     states += state + ",";
-                if (state == "LedgeGrab" || state == "LedgeStandingUp")
-                {
-                    grabbed = true;
+                if (state == "LedgeStandingUp")
+                    sawStandUp = true;
+                if (state == "GroundMove")
                     break;
-                }
                 frames++;
                 yield return null;
             }
 
             var pos = em.GetComponentData<LocalTransform>(character).Position;
-            var report = "stateTrail=" + states + " last=" + ReadCurrentState(em, character) + " pos=" + pos;
-            Debug.Log("STEP15 LedgeGrab " + report);
-            Assert.IsTrue(grabbed,
-                "Official LedgeDetection did not enter LedgeGrab on unmarked natural mesh. " + report);
+            var last = ReadCurrentState(em, character);
+            var report = "stateTrail=" + states + " last=" + last + " pos=" + pos + " sawStandUp=" + sawStandUp;
+            Debug.Log("STEP15 LedgeStandUp " + report);
+            Assert.AreEqual("GroundMove", last, "official stand-up should land on the unmarked shelf. " + report);
+            Assert.GreaterOrEqual(pos.y, 2.0f, "should be on OverhangShelf Lip top (~2.5), " + report);
+        }
+
+        static void PlaceFallingAtUnmarkedShelf(EntityManager em, Entity character)
+        {
+            ZeroBodyVelocity(em, character);
+            var lt = em.GetComponentData<LocalTransform>(character);
+            // Rock_OverhangShelf / Lip: unmarked boxes. Lip front z=4.95, top y=2.495, x=-5.5.
+            // Standing capsule radius 0.3: z must stay < 4.65 or CanGrabLedge bails on overlap
+            // and the character falls through, then walks under the lip on the ground.
+            // Shelf_Low is only ~1.07m, so hang puts feet on the ground and drops immediately.
+            // Official detection point is local (0, 1.084, 0.5). Fall into the lip, not jump onto it.
+            lt.Position = new float3(-5.5f, 1.42f, 4.58f);
+            lt.Rotation = quaternion.identity;
+            em.SetComponentData(character, lt);
+            SetBodyVelocity(em, character, new float3(0f, -1.2f, 0.8f));
+        }
+
+        static IEnumerator DriveUntilState(EntityManager em, Entity character, string expected, float seconds, float3 move, bool jumpPressed)
+        {
+            var end = Time.time + seconds;
+            var states = "";
+            var frames = 0;
+            while (Time.time < end)
+            {
+                SetDrive(em, character, move, false, jumpPressed);
+                var state = ReadCurrentState(em, character);
+                if (frames < 40)
+                    states += state + ",";
+                if (state == expected)
+                    yield break;
+                frames++;
+                yield return null;
+            }
+
+            var pos = em.GetComponentData<LocalTransform>(character).Position;
+            Assert.Fail("Timed out waiting for " + expected + " (trail=" + states + " last=" + ReadCurrentState(em, character) + " pos=" + pos + ")");
+        }
+
+        static IEnumerator HoldState(EntityManager em, Entity character, string expected, int frames, float3 move)
+        {
+            var trail = "";
+            for (var i = 0; i < frames; i++)
+            {
+                SetDrive(em, character, move, false, false);
+                var state = ReadCurrentState(em, character);
+                trail += state + ",";
+                if (state != expected)
+                {
+                    var pos = em.GetComponentData<LocalTransform>(character).Position;
+                    Assert.Fail("lost " + expected + " after " + i + " hang frames (trail=" + trail + " pos=" + pos + ")");
+                }
+                yield return null;
+            }
+        }
+
+        static int ReadHybridClipIndex()
+        {
+            foreach (var animator in Object.FindObjectsByType<Animator>(FindObjectsInactive.Include))
+            {
+                if (animator == null || animator.gameObject.name.IndexOf("CharacterMesh") < 0)
+                    continue;
+                return animator.GetInteger("ClipIndex");
+            }
+            return -1;
         }
 
         static IEnumerator WaitForState(string expected, float seconds)
@@ -145,11 +240,12 @@ namespace Tozan.Tests
             {
                 var boxed = GetComponent(em, character, bodyType);
                 var field = bodyType.GetField("RelativeVelocity");
+                var grounded = bodyType.GetField("IsGrounded");
                 if (field != null)
-                {
                     field.SetValue(boxed, linear);
-                    SetComponent(em, character, bodyType, boxed);
-                }
+                if (grounded != null && math.lengthsq(linear) > 0.01f)
+                    grounded.SetValue(boxed, false);
+                SetComponent(em, character, bodyType, boxed);
             }
 
             var velType = FindType("Unity.Physics.PhysicsVelocity");
