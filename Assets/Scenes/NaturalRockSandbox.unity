@@ -477,8 +477,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: aitorsimona.traverser::Traverser.TraverserCameraController
   cameraTarget: {fileID: 650189928}
-  topClamp: 70
-  bottomClamp: -30
+  topClamp: 40
+  bottomClamp: -20
 --- !u!1 &68792142
 GameObject:
   m_ObjectHideFlags: 0

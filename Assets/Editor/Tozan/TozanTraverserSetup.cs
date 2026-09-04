@@ -102,6 +102,8 @@ namespace Tozan.Editor
             if (camCtrl == null)
                 camCtrl = player.AddComponent<TraverserCameraController>();
             camCtrl.cameraTarget = cameraRoot;
+            camCtrl.topClamp = 40.0f;
+            camCtrl.bottomClamp = -20.0f;
 
             var follow = GameObject.Find(FollowCameraName);
             if (follow == null)
@@ -285,25 +287,67 @@ namespace Tozan.Editor
 
         static void EnsureAnimator()
         {
-            var existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
-            if (existing != null)
-                return;
+            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+            if (controller == null)
+            {
+                controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
+                EnsureBool(controller, "Move");
+                EnsureFloat(controller, "Speed");
+                EnsureFloat(controller, "Heading");
+                EnsureFloat(controller, "DirectionX");
+                EnsureFloat(controller, "FreeHangWeight");
+                EnsureFloat(controller, "IKLeftFootWeight");
+                EnsureFloat(controller, "IKRightFootWeight");
+                EnsureFloat(controller, "IKLeftHandWeight");
+                EnsureFloat(controller, "IKRightHandWeight");
 
-            var controller = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
-            EnsureBool(controller, "Move");
-            EnsureFloat(controller, "Speed");
-            EnsureFloat(controller, "Heading");
-            EnsureFloat(controller, "DirectionX");
-            EnsureFloat(controller, "FreeHangWeight");
-            EnsureFloat(controller, "IKLeftFootWeight");
-            EnsureFloat(controller, "IKRightFootWeight");
-            EnsureFloat(controller, "IKLeftHandWeight");
-            EnsureFloat(controller, "IKRightHandWeight");
+                var root = controller.layers[0].stateMachine;
+                var idle = root.AddState("Idle");
+                root.defaultState = idle;
+            }
 
-            var root = controller.layers[0].stateMachine;
-            var idle = root.AddState("Idle");
-            root.defaultState = idle;
+            AssignStandingIdleClip(controller);
             EditorUtility.SetDirty(controller);
+            AssetDatabase.SaveAssets();
+        }
+
+        static void AssignStandingIdleClip(AnimatorController controller)
+        {
+            var clip = FindStandingIdleClip();
+            if (clip == null)
+                return;
+            foreach (var child in controller.layers[0].stateMachine.states)
+            {
+                if (child.state.name == "Idle")
+                    child.state.motion = clip;
+            }
+        }
+
+        static AnimationClip FindStandingIdleClip()
+        {
+            string[] paths =
+            {
+                "Assets/Characters/UAL/AnimationLibrary_Unity_Standard.fbx",
+                "Assets/ThirdParty/DynamicParkourSystem/Model/Animations/Idle.fbx"
+            };
+            AnimationClip exact = null;
+            AnimationClip fuzzy = null;
+            foreach (var path in paths)
+            {
+                foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(path))
+                {
+                    var clip = obj as AnimationClip;
+                    if (clip == null || clip.name.StartsWith("__"))
+                        continue;
+                    if (clip.name == "Idle")
+                        exact = clip;
+                    else if (fuzzy == null && clip.name.IndexOf("Idle") >= 0)
+                        fuzzy = clip;
+                }
+                if (exact != null)
+                    return exact;
+            }
+            return exact != null ? exact : fuzzy;
         }
 
         static void EnsureFloat(AnimatorController controller, string name)

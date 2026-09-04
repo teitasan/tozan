@@ -6,8 +6,8 @@ namespace Traverser
     public class TraverserCameraController : MonoBehaviour
     {
         public Transform cameraTarget;
-        public float topClamp = 70.0f;
-        public float bottomClamp = -30.0f;
+        public float topClamp = 40.0f;
+        public float bottomClamp = -20.0f;
 
         TraverserInputController input;
         float yaw;
@@ -21,6 +21,8 @@ namespace Traverser
                 var euler = cameraTarget.rotation.eulerAngles;
                 yaw = euler.y;
                 pitch = euler.x;
+                if (pitch > 180.0f)
+                    pitch -= 360.0f;
             }
 
             Cursor.lockState = CursorLockMode.Locked;

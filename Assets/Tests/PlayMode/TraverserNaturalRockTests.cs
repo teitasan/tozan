@@ -81,6 +81,15 @@ namespace Tozan.Tests
             Assert.Greater(player.transform.position.y, -0.02f, "must not sink through the ground");
             Assert.Less(player.transform.position.y, 0.35f, "must rest on the ground, y=" + player.transform.position.y);
 
+            var animator = player.GetComponent<Animator>();
+            Assert.IsNotNull(animator);
+            var foot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+            var hips = animator.GetBoneTransform(HumanBodyBones.Hips);
+            Assert.IsNotNull(foot);
+            Assert.IsNotNull(hips);
+            Assert.Greater(foot.position.y, -0.05f, "standing Idle must not bury the feet, footY=" + foot.position.y);
+            Assert.Greater(hips.position.y, 0.6f, "standing Idle must keep hips above ground, hipsY=" + hips.position.y);
+
             var start = player.transform.position;
             yield return Hold(player, new Vector2(0f, 1f), east: false, north: false, 1.0f);
             var walked = player.transform.position.z - start.z;
