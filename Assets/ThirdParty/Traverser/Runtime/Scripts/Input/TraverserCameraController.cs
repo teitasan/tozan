@@ -48,6 +48,7 @@ namespace Traverser
             pitch += look.y;
             pitch = Mathf.Clamp(pitch, bottomClamp, topClamp);
             cameraTarget.rotation = Quaternion.Euler(pitch, yaw, 0.0f);
+            input.ConsumeLook();
         }
     }
 }

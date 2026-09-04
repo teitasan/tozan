@@ -51,6 +51,11 @@ namespace Traverser
             return inputLook;
         }
 
+        public void ConsumeLook()
+        {
+            inputLook = Vector2.zero;
+        }
+
         public bool GetInputButtonWest()
         {
             return (inputInteraction & InputInteraction.WestButton) != 0;

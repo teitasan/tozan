@@ -137,10 +137,9 @@ namespace Traverser
 
         // --- Jump ---
         private float currentJumpSpeed = 0.0f;
-        private float dampingTime = 0.15f;
         private bool wasJumping = false;
+        private bool northJumpLocked = false;
         private bool isApex = false;
-        private float groundDistance = 0.1f;
         private float currentTime = 0.0f;
 
         // --- Ability-level state ---
@@ -292,6 +291,11 @@ namespace Traverser
             Vector3 camForward = cameraTransform.forward;
             Vector3 camRight = cameraTransform.right;
             camForward.y = 0.0f;
+            camRight.y = 0.0f;
+            if (camForward.sqrMagnitude > 0.001f)
+                camForward.Normalize();
+            if (camRight.sqrMagnitude > 0.001f)
+                camRight.Normalize();
 
             Vector2 inputDirection = abilityController.inputController.GetInputMovement();
 
@@ -473,6 +477,9 @@ namespace Traverser
             previousMovementIntensity = 0.0f;
             movementAccelerationTimer = 0.0f;
             currentVelocity = Vector3.zero;
+            currentJumpSpeed = 0.0f;
+            wasJumping = false;
+            northJumpLocked = false;
             state = LocomotionAbilityState.Moving;
         }
 
@@ -608,81 +615,58 @@ namespace Traverser
 
         public void HandleJump(float speed)
         {
-            // --- Enable jumping only if on the ground and in moving state ---
-            if (!wasJumping && abilityController.inputController.GetInputButtonNorth() && state == LocomotionAbilityState.Moving
-            && (animationController.animator.GetCurrentAnimatorStateInfo(0).IsName(locomotionData.locomotionONAnimation.animationStateName) 
-               || animationController.animator.GetCurrentAnimatorStateInfo(0).IsName(locomotionData.locomotionOFFAnimation.animationStateName)) 
-            && !animationController.animator.IsInTransition(0))
+            if (!abilityController.inputController.GetInputButtonNorth())
+                northJumpLocked = false;
+
+            // Dummy Idle clips make every state name match; require grounded + a fresh press.
+            if (!wasJumping && !northJumpLocked
+                && abilityController.inputController.GetInputButtonNorth()
+                && state == LocomotionAbilityState.Moving
+                && controller.isGrounded)
             {
                 state = LocomotionAbilityState.Jumping;
                 wasJumping = true;
+                northJumpLocked = true;
                 fIKOn = false;
                 isApex = false;
                 currentTime = 0.0f;
+                currentJumpSpeed = initialJumpSpeed;
 
-                // --- Choose jump animation depending on speed ---
                 if (speed < walkSpeed)
                     animationController.animator.CrossFade(locomotionData.jumpAnimation.animationStateName, locomotionData.jumpAnimation.transitionDuration);
                 else
                     animationController.animator.CrossFade(locomotionData.jumpForwardAnimation.animationStateName, locomotionData.jumpForwardAnimation.transitionDuration);
             }
 
-            // --- If on jumping state, update jump speed ---
-            if ((state == LocomotionAbilityState.Jumping 
-                || state == LocomotionAbilityState.Falling)
-                && wasJumping)
+            if ((state == LocomotionAbilityState.Jumping || state == LocomotionAbilityState.Falling) && wasJumping)
             {
-                bool jumpingAnim = animationController.animator.GetCurrentAnimatorStateInfo(0).IsName(locomotionData.jumpAnimation.animationStateName) ||
-                    animationController.animator.GetCurrentAnimatorStateInfo(0).IsName(locomotionData.jumpForwardAnimation.animationStateName);
+                currentTime += Time.deltaTime;
 
-
-                // --- Let the animation play for some time before applying jump speed ---
-                if (jumpingAnim 
-                    && animationController.animator.GetCurrentAnimatorStateInfo(0).normalizedTime > dampingTime
-                    && currentJumpSpeed == 0.0f)
+                if (currentTime < jumpTime && !isApex)
                 {
-                    if (currentJumpSpeed == 0.0f)
-                        currentJumpSpeed = initialJumpSpeed;
-
+                    // hold launch speed briefly
                 }
-                // --- Progressively decelerate jumping speed over time ---
                 else if (currentJumpSpeed > 0.0f)
                 {
-                    if (currentTime < jumpTime && !isApex)
-                        currentTime += Time.deltaTime; //currentJumpSpeed += jumpDeceleration * Time.deltaTime;
-                    else
-                    {
-                        currentJumpSpeed -= jumpDeceleration * Time.deltaTime;
-                        isApex = true;
-                    }
-
-                    // --- If jump speed is low enough, activate falling state ---
-                    if (currentJumpSpeed <= Mathf.Abs(Physics.gravity.y))
-                    {
-                        state = LocomotionAbilityState.Falling;
-
-                        if (controller.GetYDistanceToGround(transform.position) < groundDistance)
-                            currentJumpSpeed = 0.0f;
-                    }
-
+                    currentJumpSpeed -= Mathf.Max(jumpDeceleration, 40.0f) * Time.deltaTime;
+                    isApex = true;
+                    if (currentJumpSpeed < 0.0f)
+                        currentJumpSpeed = 0.0f;
+                    state = LocomotionAbilityState.Falling;
                 }
 
-            }
+                if (currentTime > jumpTime && controller.isGrounded)
+                {
+                    if (speed < walkSpeed)
+                        animationController.animator.CrossFade(locomotionData.fallToLandAnimation.animationStateName, locomotionData.fallToLandAnimation.transitionDuration);
+                    else
+                        animationController.animator.CrossFade(locomotionData.fallToRunAnimation.animationStateName, locomotionData.fallToRunAnimation.transitionDuration);
 
-            // --- Activate landing animation ---
-            if (state == LocomotionAbilityState.Falling 
-                && currentJumpSpeed <= 0.0f
-                && wasJumping)
-            {
-                if (speed < walkSpeed)
-                    animationController.animator.CrossFade(locomotionData.fallToLandAnimation.animationStateName, locomotionData.fallToLandAnimation.transitionDuration);
-                else
-                    animationController.animator.CrossFade(locomotionData.fallToRunAnimation.animationStateName, locomotionData.fallToRunAnimation.transitionDuration);
-
-                fIKOn = true;
-                state = LocomotionAbilityState.Moving;
-                wasJumping = false;
-                currentJumpSpeed = 0.0f;
+                    fIKOn = true;
+                    state = LocomotionAbilityState.Moving;
+                    wasJumping = false;
+                    currentJumpSpeed = 0.0f;
+                }
             }
         }
 

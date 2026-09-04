@@ -165,16 +165,24 @@ namespace Traverser
                     }
                 }
             }
+
+            ApplyPredictedStep();
+        }
+
+        void ApplyPredictedStep()
+        {
+            if (animationController != null && animationController.transition.isON)
+                return;
+            if (controller.targetDisplacement.sqrMagnitude < 1e-8f)
+                return;
+            controller.ForceMove(transform.position + controller.targetDisplacement);
+            controller.targetDisplacement = Vector3.zero;
         }
 
         private void OnAnimatorMove()
         {
-            // --- Perform movement and rotation, interpolate for smoothness ---
-            if (!animationController.transition.isON)
-            {
-                controller.ForceMove(Vector3.Lerp(transform.position, transform.position + controller.targetDisplacement, Time.deltaTime / Time.fixedDeltaTime));
-                controller.ForceRotate(Quaternion.Slerp(transform.rotation, transform.rotation * Quaternion.AngleAxis(controller.targetHeading, Vector3.up), Time.deltaTime / Time.fixedDeltaTime));
-            }
+            // TOZAN: dummy Idle has no clip, so this callback is unreliable.
+            // Predicted displacement is applied in FixedUpdate instead.
         }
 
         // --------------------------------

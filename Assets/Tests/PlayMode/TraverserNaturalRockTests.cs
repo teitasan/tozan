@@ -61,6 +61,45 @@ namespace Tozan.Tests
         }
 
         [UnityTest]
+        [Timeout(15000)]
+        public IEnumerator NaturalRockSandbox_MoveIsResponsiveAndJumpDoesNotStick()
+        {
+            yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
+            yield return null;
+            yield return new WaitForFixedUpdate();
+
+            var player = GameObject.Find("TraverserPlayer");
+            Assert.IsNotNull(player);
+            player.transform.SetPositionAndRotation(new Vector3(0f, 0.1f, -6f), Quaternion.identity);
+
+            var start = player.transform.position;
+            yield return Hold(player, new Vector2(0f, 1f), east: false, north: false, 1.0f);
+            var walked = player.transform.position.z - start.z;
+            Assert.Greater(walked, 1.2f, "WASD should cover more than a crawl in 1s, moved " + walked);
+
+            SetInput(player, Vector2.zero, east: false, north: true);
+            yield return new WaitForFixedUpdate();
+            SetInput(player, Vector2.zero, east: false, north: false);
+
+            var peakY = player.transform.position.y;
+            var stillRisingAtEnd = 0;
+            for (var i = 0; i < 90; i++)
+            {
+                SetInput(player, Vector2.zero, east: false, north: true);
+                yield return new WaitForFixedUpdate();
+                var y = player.transform.position.y;
+                if (y > peakY)
+                    peakY = y;
+                if (i > 50 && y > start.y + 0.6f)
+                    stillRisingAtEnd++;
+            }
+
+            Assert.Less(player.transform.position.y, start.y + 0.5f,
+                "Jump must land instead of holding Space forever. y=" + player.transform.position.y);
+            Assert.Less(stillRisingAtEnd, 10, "Jump must not keep launching while Space is held");
+        }
+
+        [UnityTest]
         public IEnumerator NaturalRockSandbox_ConcaveMesh_DoesNotSpamClosestPoint()
         {
             yield return SceneManager.LoadSceneAsync("Assets/Scenes/NaturalRockSandbox.unity");
